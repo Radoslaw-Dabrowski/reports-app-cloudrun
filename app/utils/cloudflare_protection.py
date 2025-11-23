@@ -88,7 +88,7 @@ def check_cloudflare_protection():
     # Log for debugging
     logger.debug(f"Protection check - Host: {host}, CF-Connecting-IP: {has_cf_connecting_ip}, CF-Ray: {has_cf_ray}, CF-Country: {has_cf_country}, Client IP: {client_ip}")
     
-    # Allow if Host is allowed AND (has Cloudflare headers OR is Cloudflare IP)
+    # STRICT MODE: Require BOTH Cloudflare headers AND correct Host
     # Primary check: Cloudflare headers (most reliable)
     has_cloudflare_headers = has_cf_connecting_ip or has_cf_ray or has_cf_country
     
@@ -110,15 +110,26 @@ def check_cloudflare_protection():
             logger.warning(f"Blocked: Cloudflare IP but invalid Host ({host}, allowed: {allowed_hosts})")
             return False
     
+    # Block direct Cloud Run URLs immediately (even if they have correct Host header)
+    if 'run.app' in host or 'cloudfunctions.net' in host:
+        logger.warning(f"Blocked: Direct Cloud Run access detected (Host: {host}, IP: {client_ip})")
+        return False
+    
     # If no Cloudflare indicators and host is not allowed, block
     if not host_allowed:
         logger.warning(f"Blocked: No Cloudflare indicators and invalid Host ({host}, allowed: {allowed_hosts}, IP: {client_ip})")
         return False
     
-    # If host is allowed but no Cloudflare indicators, be more lenient
-    # This allows requests with correct Host header (might be from Cloudflare Worker)
+    # If host is allowed but no Cloudflare indicators, check if it's a direct Cloud Run URL
+    # Block direct Cloud Run URLs even if they somehow have the correct Host header
     if host_allowed:
-        logger.info(f"Allowed: Valid Host header ({host}) - assuming Cloudflare Worker")
+        # If Host is the Cloud Run URL itself, block it (direct access)
+        if 'run.app' in host or 'cloudfunctions.net' in host:
+            logger.warning(f"Blocked: Direct Cloud Run access with spoofed Host header ({host}, IP: {client_ip})")
+            return False
+        # If Host is the allowed domain but no Cloudflare headers, allow (might be from Worker without headers)
+        # BUT: This is less secure - prefer to require Cloudflare headers
+        logger.info(f"Allowed: Valid Host header ({host}) but no Cloudflare headers - less secure")
         return True
     
     # Default: block
