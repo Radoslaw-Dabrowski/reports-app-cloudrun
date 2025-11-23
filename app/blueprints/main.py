@@ -64,6 +64,107 @@ def get_s3_manager():
     )
 
 
+def is_valid_date(year, month, day):
+    """Check if a date is valid"""
+    try:
+        pd.Timestamp(f'{year}-{month:02}-{day}')
+        return True
+    except ValueError:
+        return False
+
+
+def create_table_data(filtered_df, month, year, exclude_missing, frequencies_df, customer_location_df):
+    """Create table data for monthly report - processes data for each day of the month"""
+    # Ensure the 'date' column is in datetime format
+    if 'date' in filtered_df.columns:
+        filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
+    
+    days_columns = [f'{day:02}' for day in range(1, 32) if is_valid_date(year, month, day)]
+    weekend_columns = [day for day in days_columns if pd.Timestamp(f'{year}-{month:02}-{day}').weekday() >= 5]
+    today_day = str(datetime.now().day).zfill(2) if datetime.now().month == month and datetime.now().year == year else None
+    
+    # Define start_date and end_date for the current month
+    start_date = pd.Timestamp(year=year, month=month, day=1)
+    end_date = start_date + pd.offsets.MonthEnd(1)
+    
+    table_data = []
+    for (report_name, location), group in filtered_df.groupby(['report name', 'location']):
+        new_row = {'report name': report_name, 'location': location}
+        
+        # Find frequency for this report/location
+        frequency_row = frequencies_df[
+            (frequencies_df['reportName'] == report_name) &
+            ((frequencies_df['location'] == location) | (frequencies_df['location'] == 'All Locations'))
+        ]
+        
+        if not frequency_row.empty:
+            frequency = frequency_row['frequency'].values[0]
+            specific_days = frequency_row['specificDays'].values[0] if 'specificDays' in frequency_row.columns else ''
+        else:
+            frequency = 'none'
+            specific_days = ''
+        
+        # Get delivered dates
+        if 'date' in group.columns and 'attachment' in group.columns:
+            delivered_dates = group[group['attachment'] == 'Yes']['date'].dt.date.tolist()
+        else:
+            delivered_dates = []
+        has_delivered = bool(delivered_dates)
+        
+        for day in days_columns:
+            date_str = f'{year}-{month:02}-{day}'
+            current_date = pd.Timestamp(date_str).date()
+            
+            if current_date in delivered_dates:
+                new_row[day] = 'Yes'
+            else:
+                if frequency == 'none':
+                    new_row[day] = 'Miss' if not has_delivered else 'N/A'
+                elif frequency == 'daily':
+                    new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
+                elif frequency == 'weekly':
+                    week_start = current_date - pd.to_timedelta(current_date.weekday(), unit='d')
+                    if any(date in delivered_dates for date in pd.date_range(start=week_start, periods=7).date):
+                        new_row[day] = 'N/A'
+                    else:
+                        new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
+                elif frequency == 'monthly':
+                    if any(date in delivered_dates for date in pd.date_range(start=start_date, end=end_date).date):
+                        new_row[day] = 'N/A'
+                    else:
+                        new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
+                elif frequency == 'quarterly':
+                    quarter_start = current_date.replace(month=((current_date.month - 1) // 3) * 3 + 1, day=1)
+                    quarter_end = quarter_start + pd.DateOffset(months=3) - pd.DateOffset(days=1)
+                    if any(date in delivered_dates for date in pd.date_range(start=quarter_start, end=quarter_end).date):
+                        new_row[day] = 'N/A'
+                    else:
+                        new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
+                elif frequency == 'custom':
+                    specific_days_list = [int(d) for d in specific_days.split(',') if d.isdigit()]
+                    if current_date.day in specific_days_list:
+                        new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
+                    else:
+                        new_row[day] = 'N/A'
+                elif frequency.isdigit():
+                    expected_count = int(frequency)
+                    delivered_count = len(delivered_dates)
+                    if delivered_count < expected_count:
+                        new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
+                    else:
+                        new_row[day] = 'N/A'
+                else:
+                    new_row[day] = '' if current_date > datetime.now().date() else 'No'
+        table_data.append(new_row)
+    
+    table_data = pd.DataFrame(table_data, columns=['report name', 'location'] + days_columns)
+    
+    if exclude_missing:
+        table_data = table_data[~table_data.apply(lambda row: row.isin(['Miss']).any(), axis=1)]
+    
+    return table_data, days_columns, weekend_columns, today_day
+
+
 @main_bp.route('/')
 def index():
     """Home page"""
@@ -582,21 +683,27 @@ def monthly_report_page():
     if exclude_missing:
         filtered_df = filtered_df[~filtered_df.apply(lambda row: row.str.contains('Missing').any(), axis=1)]
     
-    customers = reports_df['customer'].unique()
-    locations = customer_location_df['location'].unique()
-    reports = reports_df['report name'].unique()
+    customers = reports_df['customer'].unique() if 'customer' in reports_df.columns else []
+    locations = customer_location_df['location'].unique() if 'location' in customer_location_df.columns else []
+    reports = reports_df['report name'].unique() if 'report name' in reports_df.columns else []
     
-    # TODO: Implement create_table_data function
-    # For now, return basic template
+    # Create table data using the create_table_data function
+    table_data, days_columns, weekend_columns, today_day = create_table_data(
+        filtered_df, month, year, exclude_missing, frequencies_df, customer_location_df
+    )
+    
     selected_month_name = pd.to_datetime(f'{year}-{month:02}-01').strftime('%B')
     frequencies_data = frequencies_df.to_dict(orient='records')
     
     return render_template(
         TEMPLATE_MONTHLY_REPORTS,
-        reports=filtered_df.to_dict('records'),
+        table_data=table_data,
+        days_columns=days_columns,
+        weekend_columns=weekend_columns,
+        today_day=today_day,
         customers=customers,
         locations=locations,
-        report_names=reports,
+        reports=reports,
         selected_customer=selected_customer,
         selected_location=selected_location,
         selected_report=selected_report,
