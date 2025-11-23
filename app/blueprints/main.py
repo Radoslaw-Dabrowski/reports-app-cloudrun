@@ -670,6 +670,32 @@ def alerts_report_page():
         return render_template(TEMPLATE_ALERTS_REPORT, alerts_data=[])
 
 
+@main_bp.route('/set_frequencies', methods=['POST'])
+def set_frequencies():
+    """Update frequencies - saves to S3 only (stateless)"""
+    try:
+        frequency_data = request.form.get('frequencyData')
+        if frequency_data:
+            frequencies_df = pd.DataFrame(json.loads(frequency_data))
+            
+            # Upload the updated frequencies to S3
+            s3_manager = get_s3_manager()
+            success = s3_manager.write_csv(frequencies_df, 'frequencies.csv')
+            
+            if success:
+                flash('Frequencies updated successfully', 'success')
+            else:
+                flash('Failed to update frequencies', 'error')
+        else:
+            flash('No frequency data received', 'error')
+        
+        return redirect(url_for('main.monthly_report_page'))
+    except Exception as e:
+        logger.error(f"Error in set_frequencies: {e}", exc_info=True)
+        flash(f'Error updating frequencies: {str(e)}', 'error')
+        return redirect(url_for('main.monthly_report_page'))
+
+
 @main_bp.route('/monthly_report')
 @cached(timeout=1800, key_prefix="monthly_report")
 def monthly_report_page():
