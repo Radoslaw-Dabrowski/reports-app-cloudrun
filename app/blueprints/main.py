@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from app.utils.cache import cached
 from app.utils.database import db_manager
 from app.utils.s3_client import S3Manager
+from app.utils.gcs_client import GCSManager
 from app.config import Config
 import pandas as pd
 import json
@@ -62,6 +63,31 @@ def get_s3_manager():
         aws_secret_key=Config.AWS_SECRET_ACCESS_KEY,
         region=Config.AWS_DEFAULT_REGION
     )
+
+
+def get_gcs_manager():
+    """Get GCS manager instance"""
+    return GCSManager(
+        bucket_name=Config.GCS_BUCKET_NAME,
+        project_id=Config.GCP_PROJECT_ID
+    )
+
+
+def get_storage_manager():
+    """
+    Get storage manager - prefers GCS if available, falls back to S3.
+    This reduces AWS egress costs by using GCS as cache.
+    """
+    if Config.DATA_SOURCE == 'gcs':
+        gcs_manager = get_gcs_manager()
+        # Check if GCS has data, if not fallback to S3
+        if gcs_manager.file_exists('report.csv'):
+            return gcs_manager
+        else:
+            logger.warning("GCS cache empty, falling back to S3")
+            return get_s3_manager()
+    else:
+        return get_s3_manager()
 
 
 def is_valid_date(year, month, day):
@@ -190,18 +216,20 @@ def index():
 def debug_s3_files():
     """Debug endpoint to list files in S3 bucket"""
     try:
-        s3_manager = get_s3_manager()
-        all_files = s3_manager.list_files()
+        storage_manager = get_storage_manager()
+        all_files = storage_manager.list_files()
         csv_files = [f for f in all_files if f.endswith('.csv')]
         
         # Also check common prefixes/folders
         prefixes = ['', 'reports/', 'data/', 'csv/']
         files_by_prefix = {}
         for prefix in prefixes:
-            files_by_prefix[prefix or 'root'] = s3_manager.list_files(prefix=prefix)
+            files_by_prefix[prefix or 'root'] = storage_manager.list_files(prefix=prefix)
         
+        bucket_name = Config.GCS_BUCKET_NAME if Config.DATA_SOURCE == 'gcs' else Config.S3_BUCKET_NAME
         return jsonify({
-            'bucket': Config.S3_BUCKET_NAME,
+            'bucket': bucket_name,
+            'source': Config.DATA_SOURCE,
             'all_files': all_files[:50],  # First 50 files
             'csv_files': csv_files[:50],
             'count': len(all_files),
@@ -215,10 +243,10 @@ def debug_s3_files():
 
 @main_bp.route('/debug/test-csv/<filename>')
 def debug_test_csv(filename):
-    """Debug endpoint to test reading a CSV file from S3"""
+    """Debug endpoint to test reading a CSV file from storage"""
     try:
-        s3_manager = get_s3_manager()
-        df = s3_manager.read_csv(filename)
+        storage_manager = get_storage_manager()
+        df = storage_manager.read_csv(filename)
         return jsonify({
             'filename': filename,
             'rows': len(df),
@@ -234,12 +262,12 @@ def debug_test_csv(filename):
 def snapshot_report_page():
     """Snapshot report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
+        storage_manager = get_storage_manager()
         # Try different possible file names
-        snapshot_reports_df = s3_manager.read_csv('combined_snapshot_reports.csv')
+        snapshot_reports_df = storage_manager.read_csv('combined_snapshot_reports.csv')
         if snapshot_reports_df.empty:
             # Try alternative name
-            snapshot_reports_df = s3_manager.read_csv('snapshot_reports.csv')
+            snapshot_reports_df = storage_manager.read_csv('snapshot_reports.csv')
         if snapshot_reports_df.empty:
             logger.warning("Snapshot reports file is empty or not found")
             return render_template(TEMPLATE_SNAPSHOT_REPORTS, table_data=[])
@@ -255,8 +283,8 @@ def snapshot_report_page():
 def vhealth_report_page():
     """vHealth report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_vhealth_df = s3_manager.read_csv('combined_vhealth_reports.csv')
+        storage_manager = get_storage_manager()
+        combined_vhealth_df = storage_manager.read_csv('combined_vhealth_reports.csv')
         if combined_vhealth_df.empty:
             return render_template(TEMPLATE_VHEALTH_REPORTS, table_data='[]')
         table_data = combined_vhealth_df.to_dict(orient='records')
@@ -271,9 +299,9 @@ def vhealth_report_page():
 def firmware_report_page():
     """Firmware report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_firmware_df = s3_manager.read_csv('combined_firmware_reports.csv')
-        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
+        storage_manager = get_storage_manager()
+        combined_firmware_df = storage_manager.read_csv('combined_firmware_reports.csv')
+        customer_locations_df = storage_manager.read_csv('customer_locations.csv')
         
         if combined_firmware_df.empty or customer_locations_df.empty:
             return render_template(TEMPLATE_FIRMWARE_REPORTS, table_data=[], customers=[], locations=[])
@@ -325,8 +353,8 @@ def firmware_report_page():
 def vinfo_report_page():
     """vInfo report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        rvtools_vinfo_df = s3_manager.read_csv('rvtools_vinfo.csv')
+        storage_manager = get_storage_manager()
+        rvtools_vinfo_df = storage_manager.read_csv('rvtools_vinfo.csv')
         
         if rvtools_vinfo_df.empty:
             return render_template(TEMPLATE_VINFO_REPORT, table_data=[], customers=[], locations=[])
@@ -362,8 +390,8 @@ def vinfo_report_page():
 def vdisk_report_page():
     """vDisk report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_vdisk_reports_df = s3_manager.read_csv('combined_vdisk_reports.csv')
+        storage_manager = get_storage_manager()
+        combined_vdisk_reports_df = storage_manager.read_csv('combined_vdisk_reports.csv')
         if combined_vdisk_reports_df.empty:
             return render_template(TEMPLATE_VDISK_REPORT, table_data=[])
         table_data = combined_vdisk_reports_df.to_dict(orient='records')
@@ -377,8 +405,8 @@ def vdisk_report_page():
 def vhosts_report_page():
     """vHosts report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_vhosts_reports_df = s3_manager.read_csv('combined_vhosts_reports.csv')
+        storage_manager = get_storage_manager()
+        combined_vhosts_reports_df = storage_manager.read_csv('combined_vhosts_reports.csv')
         if combined_vhosts_reports_df.empty:
             return render_template(TEMPLATE_VHOSTS_REPORT, table_data=[])
         table_data = combined_vhosts_reports_df.to_dict(orient='records')
@@ -392,8 +420,8 @@ def vhosts_report_page():
 def statistics_report_page():
     """Statistics report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        vrops_alerts_df = s3_manager.read_csv('vrops_alerts_historical.csv')
+        storage_manager = get_storage_manager()
+        vrops_alerts_df = storage_manager.read_csv('vrops_alerts_historical.csv')
         
         if vrops_alerts_df.empty:
             return render_template(TEMPLATE_STATISTICS_REPORT, table_data=[], locations=[])
@@ -444,14 +472,13 @@ def statistics_report_page():
 def network_utilization_report_page():
     """Network utilization report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_network_utilization_df = s3_manager.read_csv('combined_network_utilization_report.csv')
+        storage_manager = get_storage_manager()
+        combined_network_utilization_df = storage_manager.read_csv('combined_network_utilization_report.csv')
         
-        # Load exclusions from S3
+        # Load exclusions from storage
         excluded_networks_df = pd.DataFrame(columns=['Network', 'Location'])
         try:
-            s3_manager = get_s3_manager()
-            excluded_networks_df = s3_manager.read_csv('excluded_networks.csv')
+            excluded_networks_df = storage_manager.read_csv('excluded_networks.csv')
             if excluded_networks_df.empty or 'Network' not in excluded_networks_df.columns or 'Location' not in excluded_networks_df.columns:
                 excluded_networks_df = pd.DataFrame(columns=['Network', 'Location'])
         except Exception as e:
@@ -507,8 +534,8 @@ def network_utilization_report_page():
 def certificate_expiry_report_page():
     """Certificate expiry report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        certificate_expiry_df = s3_manager.read_csv('combined_certificate_expiry_reports.csv')
+        storage_manager = get_storage_manager()
+        certificate_expiry_df = storage_manager.read_csv('combined_certificate_expiry_reports.csv')
         table_data = certificate_expiry_df.to_dict(orient='records') if not certificate_expiry_df.empty else []
         
         customer_locations_df = s3_manager.read_csv('customer_locations.csv')
@@ -539,8 +566,8 @@ def certificate_expiry_report_page():
 def password_expiration_report_page():
     """Password expiration report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        password_expiration_df = s3_manager.read_csv('combined_password_expiration_reports.csv')
+        storage_manager = get_storage_manager()
+        password_expiration_df = storage_manager.read_csv('combined_password_expiration_reports.csv')
         table_data = password_expiration_df.to_dict(orient='records') if not password_expiration_df.empty else []
         
         customer_locations_df = s3_manager.read_csv('customer_locations.csv')
@@ -571,8 +598,8 @@ def password_expiration_report_page():
 def antivirus_asset_report_page():
     """Antivirus asset report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_antivirus_asset_report_df = s3_manager.read_csv('combined_antivirus_asset_reports.csv')
+        storage_manager = get_storage_manager()
+        combined_antivirus_asset_report_df = storage_manager.read_csv('combined_antivirus_asset_reports.csv')
         table_data = combined_antivirus_asset_report_df.to_dict(orient='records') if not combined_antivirus_asset_report_df.empty else []
         
         customer_locations_df = s3_manager.read_csv('customer_locations.csv')
@@ -603,9 +630,9 @@ def antivirus_asset_report_page():
 def env_versions_report_page():
     """Environment versions report page - reads directly from S3"""
     try:
-        s3_manager = get_s3_manager()
-        combined_non_vcf_inventory_df = s3_manager.read_csv('combined_non_vcf_inventory.csv')
-        combined_vcf_inventory_df = s3_manager.read_csv('combined_vcf_inventory.csv')
+        storage_manager = get_storage_manager()
+        combined_non_vcf_inventory_df = storage_manager.read_csv('combined_non_vcf_inventory.csv')
+        combined_vcf_inventory_df = storage_manager.read_csv('combined_vcf_inventory.csv')
         
         if combined_non_vcf_inventory_df.empty and combined_vcf_inventory_df.empty:
             return render_template(TEMPLATE_ENV_VERSIONS_REPORT, table_data=[])
@@ -645,8 +672,8 @@ def alerts_report_page():
     """Alerts report page - reads directly from S3"""
     try:
         location = request.args.get('location')
-        s3_manager = get_s3_manager()
-        vrops_list_of_alerts_df = s3_manager.read_csv('combined_vrops_list_of_alerts.csv')
+        storage_manager = get_storage_manager()
+        vrops_list_of_alerts_df = storage_manager.read_csv('combined_vrops_list_of_alerts.csv')
         
         if vrops_list_of_alerts_df.empty:
             return render_template(TEMPLATE_ALERTS_REPORT, alerts_data=[])
@@ -678,9 +705,15 @@ def set_frequencies():
         if frequency_data:
             frequencies_df = pd.DataFrame(json.loads(frequency_data))
             
-            # Upload the updated frequencies to S3
+            # Upload the updated frequencies to both S3 (source) and GCS (cache)
             s3_manager = get_s3_manager()
-            success = s3_manager.write_csv(frequencies_df, 'frequencies.csv')
+            s3_success = s3_manager.write_csv(frequencies_df, 'frequencies.csv')
+            
+            # Also update GCS cache if available
+            gcs_manager = get_gcs_manager()
+            gcs_success = gcs_manager.write_csv(frequencies_df, 'frequencies.csv')
+            
+            success = s3_success  # Primary success is S3
             
             if success:
                 flash('Frequencies updated successfully', 'success')
@@ -708,10 +741,10 @@ def monthly_report_page():
     exclude_missing = request.args.get('exclude_missing', 'false').lower() == 'true'
     
     # Load data directly from S3 (stateless)
-    s3_manager = get_s3_manager()
-    reports_df = s3_manager.read_csv('report.csv')
-    frequencies_df = s3_manager.read_csv('frequencies.csv')
-    customer_location_df = s3_manager.read_csv('customer_locations.csv')
+    storage_manager = get_storage_manager()
+    reports_df = storage_manager.read_csv('report.csv')
+    frequencies_df = storage_manager.read_csv('frequencies.csv')
+    customer_location_df = storage_manager.read_csv('customer_locations.csv')
     
     if reports_df.empty:
         logger.warning("report.csv is empty")
@@ -847,14 +880,159 @@ def monthly_report_page():
 
 @main_bp.route('/refresh_cache', methods=['POST', 'GET'])
 def refresh_cache():
-    """Refresh cache - for Cloud Run, data is always read from S3, so this is a no-op"""
-    # In Cloud Run, we read directly from S3, so there's nothing to refresh
-    # This endpoint exists for compatibility with the original version
-    if request.method == 'GET':
-        next_page = request.args.get('next', 'main.index')
-        return redirect(url_for(next_page))
+    """
+    Refresh cache - copies data from S3 to GCS.
+    This reduces egress costs by caching data in GCS.
+    """
+    try:
+        logger.info("Starting data refresh: copying from S3 to GCS")
+        
+        # Get managers
+        s3_manager = get_s3_manager()
+        gcs_manager = get_gcs_manager()
+        
+        # List of CSV files to copy
+        csv_files = [
+            'report.csv',
+            'frequencies.csv',
+            'customer_locations.csv',
+            'vrops_alerts_historical.csv',
+            'vrops_list_of_alerts.csv',
+            'combined_non_vcf_inventory.csv',
+            'combined_vcf_inventory.csv',
+            'excluded_networks.csv',
+            'combined_snapshot_reports.csv',
+            'combined_vhealth_reports.csv',
+            'combined_firmware_reports.csv',
+            'rvtools_vinfo.csv',
+            'combined_vdisk_reports.csv',
+            'combined_vhosts_reports.csv',
+            'combined_network_utilization_report.csv',
+            'combined_certificate_expiry_reports.csv',
+            'combined_password_expiration_reports.csv',
+            'combined_antivirus_asset_reports.csv',
+            'combined_vrops_list_of_alerts.csv',
+        ]
+        
+        # List all files in S3 to find additional CSVs
+        s3_files = s3_manager.list_files()
+        csv_files_from_s3 = [f for f in s3_files if f.endswith('.csv')]
+        csv_files = list(set(csv_files + csv_files_from_s3))
+        
+        copied_files = []
+        total_size = 0
+        failed_files = []
+        
+        for filename in csv_files:
+            try:
+                # Read from S3
+                logger.info(f"Copying {filename} from S3 to GCS")
+                df = s3_manager.read_csv(filename)
+                
+                if df.empty:
+                    logger.warning(f"{filename} is empty, skipping")
+                    continue
+                
+                # Write to GCS
+                success = gcs_manager.write_csv(df, filename)
+                
+                if success:
+                    file_size = gcs_manager.get_file_size(filename)
+                    total_size += file_size
+                    copied_files.append({
+                        'filename': filename,
+                        'rows': len(df),
+                        'size_bytes': file_size
+                    })
+                    logger.info(f"Successfully copied {filename} ({len(df)} rows, {file_size} bytes)")
+                else:
+                    failed_files.append(filename)
+                    logger.error(f"Failed to copy {filename}")
+                    
+            except Exception as e:
+                logger.error(f"Error copying {filename}: {e}", exc_info=True)
+                failed_files.append(filename)
+        
+        # Calculate costs
+        total_size_gb = total_size / (1024 ** 3)
+        costs = calculate_migration_costs(total_size_gb, len(copied_files))
+        
+        result = {
+            'status': 'success' if not failed_files else 'partial',
+            'message': f'Copied {len(copied_files)} files ({total_size_gb:.2f} GB) from S3 to GCS',
+            'copied_files': copied_files,
+            'failed_files': failed_files,
+            'total_size_gb': round(total_size_gb, 2),
+            'costs': costs
+        }
+        
+        if request.method == 'GET':
+            next_page = request.args.get('next', 'main.index')
+            flash(result['message'], 'success' if not failed_files else 'warning')
+            return redirect(url_for(next_page))
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logger.error(f"Error in refresh_cache: {e}", exc_info=True)
+        error_msg = f'Error refreshing data: {str(e)}'
+        
+        if request.method == 'GET':
+            flash(error_msg, 'error')
+            return redirect(url_for('main.index'))
+        
+        return jsonify({'status': 'error', 'message': error_msg}), 500
+
+
+def calculate_migration_costs(total_size_gb: float, num_files: int) -> dict:
+    """
+    Calculate costs for migrating data from S3 to GCS.
     
-    return jsonify({'status': 'success', 'message': 'Data is always fresh from S3'}), 200
+    Costs (as of 2024):
+    - AWS S3 egress (first 10TB): $0.09/GB
+    - GCS Standard Storage: $0.020/GB/month
+    - GCS Class A operations (write): $0.05/10k operations
+    - GCS Class B operations (read): $0.004/10k operations
+    - GCS to Cloud Run transfer: FREE (same region)
+    
+    Returns:
+        Dictionary with cost breakdown
+    """
+    # AWS S3 egress cost (one-time)
+    aws_egress_cost = total_size_gb * 0.09  # $0.09/GB
+    
+    # GCS storage cost (monthly)
+    gcs_storage_monthly = total_size_gb * 0.020  # $0.020/GB/month
+    
+    # GCS operations cost
+    # Class A (write): assume 1 write per file
+    gcs_write_ops = num_files
+    gcs_write_cost = (gcs_write_ops / 10000) * 0.05  # $0.05/10k ops
+    
+    # Class B (read): assume 100 reads per day = 3000/month
+    reads_per_month = 100 * 30
+    gcs_read_ops = reads_per_month
+    gcs_read_cost = (gcs_read_ops / 10000) * 0.004  # $0.004/10k ops
+    
+    total_monthly = gcs_storage_monthly + gcs_write_cost + gcs_read_cost
+    
+    return {
+        'one_time_migration': {
+            'aws_egress_usd': round(aws_egress_cost, 4),
+            'gcs_write_ops_usd': round(gcs_write_cost, 4),
+            'total_usd': round(aws_egress_cost + gcs_write_cost, 4)
+        },
+        'monthly_ongoing': {
+            'gcs_storage_usd': round(gcs_storage_monthly, 4),
+            'gcs_read_ops_usd': round(gcs_read_cost, 4),
+            'total_usd': round(total_monthly, 4)
+        },
+        'savings_vs_s3_egress': {
+            's3_egress_per_month_usd': round(reads_per_month * (total_size_gb * 0.09), 4),
+            'gcs_total_per_month_usd': round(total_monthly, 4),
+            'savings_usd': round((reads_per_month * (total_size_gb * 0.09)) - total_monthly, 4)
+        }
+    }
 
 
 # Additional routes for scraping and data APIs
@@ -866,8 +1044,8 @@ import re
 def get_locations():
     """Get list of locations from S3"""
     try:
-        s3_manager = get_s3_manager()
-        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
+        storage_manager = get_storage_manager()
+        customer_locations_df = storage_manager.read_csv('customer_locations.csv')
         if customer_locations_df.empty:
             return []
         
@@ -939,8 +1117,8 @@ def vmware_versions_report_page():
 def get_vhosts_data():
     """Get vHosts data as JSON - reads directly from S3"""
     location = request.args.get('location', 'all')
-    s3_manager = get_s3_manager()
-    combined_vhosts_reports_df = s3_manager.read_csv('combined_vhosts_reports.csv')
+    storage_manager = get_storage_manager()
+    combined_vhosts_reports_df = storage_manager.read_csv('combined_vhosts_reports.csv')
     
     def extract_version_and_build(esx_version):
         match = re.search(r'VMware ESXi (\d+\.\d+)\.\d+ build-(\d+)', str(esx_version))
@@ -1023,8 +1201,8 @@ def get_vinfo_data():
     """Get vInfo data as JSON - reads directly from S3"""
     location = request.args.get('location', 'all')
     vcenter_data = scrape_vcenter_versions()
-    s3_manager = get_s3_manager()
-    vinfo_df = s3_manager.read_csv('rvtools_vinfo.csv')
+    storage_manager = get_storage_manager()
+    vinfo_df = storage_manager.read_csv('rvtools_vinfo.csv')
     vcs_machines = vinfo_df[vinfo_df['VM'].str.contains("vcs00", na=False)].copy()
     
     vcs_machines.loc[:, 'Location'] = vinfo_df.loc[

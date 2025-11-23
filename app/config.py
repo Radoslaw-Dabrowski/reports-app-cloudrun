@@ -31,11 +31,18 @@ class Config:
             # Standard TCP connection
             return f"postgresql://{cls.DB_USER}:{cls.DB_PASSWORD}@{cls.DB_HOST}:{cls.DB_PORT}/{cls.DB_NAME}"
 
-    # AWS S3
+    # AWS S3 (source)
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
     AWS_DEFAULT_REGION = os.getenv('AWS_DEFAULT_REGION', 'eu-north-1')
     S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'dhc-reports')
+    
+    # Google Cloud Storage (cache)
+    GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME', 'dhc-reports-cache')
+    GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID', os.getenv('GOOGLE_CLOUD_PROJECT'))
+    
+    # Data source preference: 'gcs' (default) or 's3'
+    DATA_SOURCE = os.getenv('DATA_SOURCE', 'gcs')
 
     # Redis Cache (Cloud Memorystore)
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
