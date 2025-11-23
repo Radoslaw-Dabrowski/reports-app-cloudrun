@@ -900,6 +900,14 @@ def refresh_cache():
         s3_manager = get_s3_manager()
         gcs_manager = get_gcs_manager()
         
+        if gcs_manager is None:
+            error_msg = 'GCS not available. Install google-cloud-storage package.'
+            logger.error(error_msg)
+            if request.method == 'GET':
+                flash(error_msg, 'error')
+                return redirect(url_for('main.index'))
+            return jsonify({'status': 'error', 'message': error_msg}), 500
+        
         # List of CSV files to copy
         csv_files = [
             'report.csv',
