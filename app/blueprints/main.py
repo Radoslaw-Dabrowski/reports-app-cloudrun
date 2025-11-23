@@ -99,7 +99,15 @@ def create_table_data(filtered_df, month, year, exclude_missing, frequencies_df,
         
         if not frequency_row.empty:
             frequency = frequency_row['frequency'].values[0]
-            specific_days = frequency_row['specificDays'].values[0] if 'specificDays' in frequency_row.columns else ''
+            if 'specificDays' in frequency_row.columns:
+                specific_days_val = frequency_row['specificDays'].values[0]
+                # Handle NaN/None values
+                if pd.isna(specific_days_val):
+                    specific_days = ''
+                else:
+                    specific_days = str(specific_days_val)
+            else:
+                specific_days = ''
         else:
             frequency = 'none'
             specific_days = ''
@@ -144,7 +152,11 @@ def create_table_data(filtered_df, month, year, exclude_missing, frequencies_df,
                     else:
                         new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
                 elif frequency == 'custom':
-                    specific_days_list = [int(d) for d in specific_days.split(',') if d.isdigit()]
+                    # Handle empty or invalid specific_days
+                    if specific_days and isinstance(specific_days, str):
+                        specific_days_list = [int(d) for d in specific_days.split(',') if d.strip().isdigit()]
+                    else:
+                        specific_days_list = []
                     if current_date.day in specific_days_list:
                         new_row[day] = 'No' if current_date <= datetime.now().date() else 'N/A'
                     else:
@@ -784,6 +796,9 @@ def monthly_report_page():
     selected_month_name = pd.to_datetime(f'{year}-{month:02}-01').strftime('%B')
     frequencies_data = frequencies_df.to_dict(orient='records')
     
+    # Convert reports to list of strings for template sorting
+    reports_list = [str(r) for r in reports] if len(reports) > 0 else []
+    
     return render_template(
         TEMPLATE_MONTHLY_REPORTS,
         table_data=table_data,
@@ -792,7 +807,7 @@ def monthly_report_page():
         today_day=today_day,
         customers=customers,
         locations=locations,
-        reports=reports,
+        reports=reports_list,  # Use list of strings instead of numpy array
         selected_customer=selected_customer,
         selected_location=selected_location,
         selected_report=selected_report,
