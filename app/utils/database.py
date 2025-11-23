@@ -84,6 +84,16 @@ class DatabaseManager:
             DataFrame with table contents
         """
         try:
+            # Lazy initialization - try to initialize if not already done
+            if self._engine is None:
+                from app.config import Config
+                database_url = Config.get_database_url()
+                if database_url and database_url != "postgresql://postgres:@localhost:5432/reports_db":
+                    self.init_engine(database_url)
+                else:
+                    logger.warning("Database not configured. Returning empty DataFrame.")
+                    return pd.DataFrame()
+            
             query = f"SELECT * FROM {table_name}"
             df = pd.read_sql(query, self.engine)
             logger.info(f"Successfully read {len(df)} rows from {table_name}")

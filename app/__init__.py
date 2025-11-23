@@ -78,16 +78,25 @@ def setup_logging(app):
 
 
 def init_database(app):
-    """Initialize database connection (lazy)"""
+    """Initialize database connection (lazy) - only when first used"""
     from app.utils.database import db_manager
     from app.config import Config
 
-    # Flask 2.2+ removed before_first_request, so we initialize directly
-    # with app context to ensure it's available when needed
+    # Don't initialize at startup - let it initialize lazily on first use
+    # This allows the app to start even if database is not available
     with app.app_context():
-        app.logger.info("Initializing database connection")
+        app.logger.info("Database will be initialized on first use")
+        # Store config for lazy initialization
         database_url = Config.get_database_url()
-        db_manager.init_engine(database_url)
+        # Only initialize if we have valid connection info
+        if database_url and database_url != "postgresql://postgres:@localhost:5432/reports_db":
+            try:
+                db_manager.init_engine(database_url)
+                app.logger.info("Database connection initialized")
+            except Exception as e:
+                app.logger.warning(f"Could not initialize database at startup: {e}. Will retry on first use.")
+        else:
+            app.logger.warning("Database URL not configured. App will work but database features will be unavailable.")
 
 
 def register_blueprints(app):
