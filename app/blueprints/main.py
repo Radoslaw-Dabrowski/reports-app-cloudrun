@@ -157,17 +157,39 @@ def firmware_report_page():
 
 @main_bp.route('/vinfo_report')
 def vinfo_report_page():
-    """vInfo report page"""
-    rvtools_vinfo_df = db_manager.read_table('rvtools_vinfo')
-    
-    if 'Location' not in rvtools_vinfo_df.columns:
-        raise KeyError("'Location' column is missing from rvtools_vinfo_df")
-    
-    table_data = rvtools_vinfo_df.to_dict(orient='records')
-    customers = sorted(rvtools_vinfo_df['Customer'].unique())
-    locations = sorted(rvtools_vinfo_df['Location'].unique())
-    
-    return render_template(TEMPLATE_VINFO_REPORT, table_data=table_data, customers=customers, locations=locations)
+    """vInfo report page - reads directly from S3"""
+    try:
+        s3_manager = get_s3_manager()
+        rvtools_vinfo_df = s3_manager.read_csv('rvtools_vinfo.csv')
+        
+        if rvtools_vinfo_df.empty:
+            return render_template(TEMPLATE_VINFO_REPORT, table_data=[], customers=[], locations=[])
+        
+        # Find column names (case-insensitive)
+        location_col = None
+        for col in ['Location', 'location', 'LOCATION']:
+            if col in rvtools_vinfo_df.columns:
+                location_col = col
+                break
+        
+        customer_col = None
+        for col in ['Customer', 'customer', 'CUSTOMER']:
+            if col in rvtools_vinfo_df.columns:
+                customer_col = col
+                break
+        
+        if not location_col:
+            logger.error(f"Location column not found. Available: {rvtools_vinfo_df.columns.tolist()}")
+            return render_template(TEMPLATE_VINFO_REPORT, table_data=[], customers=[], locations=[])
+        
+        table_data = rvtools_vinfo_df.to_dict(orient='records')
+        customers = sorted(rvtools_vinfo_df[customer_col].unique()) if customer_col else []
+        locations = sorted(rvtools_vinfo_df[location_col].unique())
+        
+        return render_template(TEMPLATE_VINFO_REPORT, table_data=table_data, customers=customers, locations=locations)
+    except Exception as e:
+        logger.error(f"Error in vinfo_report_page: {e}", exc_info=True)
+        return render_template(TEMPLATE_VINFO_REPORT, table_data=[], customers=[], locations=[])
 
 
 @main_bp.route('/vdisk_report')
