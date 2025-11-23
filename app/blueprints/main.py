@@ -989,7 +989,31 @@ def refresh_cache():
         }
         
         if request.method == 'GET':
+            # Check if this is an AJAX request (wants JSON)
+            if request.headers.get('Accept') == 'application/json' or request.args.get('format') == 'json':
+                # Return JSON for AJAX requests
+                return jsonify(result), 200
+            
+            # For regular browser navigation, redirect
             next_page = request.args.get('next', 'main.index')
+            # Convert path to endpoint name if needed
+            if next_page.startswith('/'):
+                # Convert /monthly_report to main.monthly_report_page
+                if next_page == '/monthly_report':
+                    next_page = 'main.monthly_report_page'
+                elif next_page == '/':
+                    next_page = 'main.index'
+                else:
+                    # Try to find the route
+                    from flask import current_app
+                    with current_app.app_context():
+                        for rule in current_app.url_map.iter_rules():
+                            if rule.rule == next_page:
+                                next_page = rule.endpoint
+                                break
+                    if next_page.startswith('/'):
+                        next_page = 'main.index'  # Fallback
+            
             flash(result['message'], 'success' if not failed_files else 'warning')
             return redirect(url_for(next_page))
         
