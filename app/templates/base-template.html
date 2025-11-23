@@ -130,27 +130,50 @@
 <script>
     document.getElementById("refresh-button").onclick = function(event) {
         event.preventDefault();
-        this.disabled = true;
+        var button = this;
+        button.disabled = true;
 
-        fetch('/load_s3_to_db?next=' + window.location.pathname)
+        fetch('/refresh_cache?next=' + encodeURIComponent(window.location.pathname), {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        })
             .then(response => {
                 console.log("Response status:", response.status);
-                return response.json(); // Attempt to parse the response as JSON
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    return response.json().then(err => Promise.reject(err));
+                }
             })
             .then(data => {
-                console.log("Response data:", data); // Log the response data
-                if (data.status === "success") {
-                    alert("Data refreshed successfully.");
+                console.log("Response data:", data);
+                if (data.status === "success" || data.status === "partial") {
+                    var message = data.message || "Data refreshed successfully.";
+                    if (data.costs) {
+                        message += "\n\nCosts: $" + data.costs.one_time_migration.total_usd + " (one-time)";
+                        message += "\nMonthly: $" + data.costs.monthly_ongoing.total_usd;
+                    }
+                    alert(message);
                     window.location.reload();
                 } else {
-                    alert("Error refreshing data: " + data.message);
-                    this.disabled = false;
+                    alert("Error refreshing data: " + (data.message || "Unknown error"));
+                    button.disabled = false;
                 }
             })
             .catch(error => {
-                console.error("Network error:", error);
-                alert("Network error. Please try again.");
-                this.disabled = false;
+                console.error("Error:", error);
+                var errorMsg = "Error refreshing data: ";
+                if (error.message) {
+                    errorMsg += error.message;
+                } else if (typeof error === 'string') {
+                    errorMsg += error;
+                } else {
+                    errorMsg += "Please check console for details.";
+                }
+                alert(errorMsg);
+                button.disabled = false;
             });
     };
 
