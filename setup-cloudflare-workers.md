@@ -23,8 +23,16 @@ async function handleRequest(request) {
   // Cloud Run service URL
   const cloudRunUrl = 'https://reports-app-cloudrun-299435740891.europe-west1.run.app' + url.pathname + url.search;
   
-  // Preserve original headers
-  const headers = new Headers(request.headers);
+  // Create new headers - preserve Cloudflare headers and add Host
+  const headers = new Headers();
+  
+  // Copy all original headers (including Cloudflare headers like CF-Connecting-IP, CF-Ray)
+  for (const [key, value] of request.headers) {
+    headers.set(key, value);
+  }
+  
+  // Ensure Host header is set to the original domain (for Cloud Run protection)
+  headers.set('Host', 'reporting.dabronet.pl');
   
   // Forward request to Cloud Run
   const modifiedRequest = new Request(cloudRunUrl, {

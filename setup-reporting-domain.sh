@@ -57,8 +57,16 @@ async function handleRequest(request) {
   // Cloud Run service URL
   const cloudRunUrl = '${CLOUD_RUN_URL}' + url.pathname + url.search;
   
-  // Preserve original headers
-  const headers = new Headers(request.headers);
+  // Create new headers - preserve Cloudflare headers and add Host
+  const headers = new Headers();
+  
+  // Copy all original headers
+  for (const [key, value] of request.headers) {
+    headers.set(key, value);
+  }
+  
+  // Ensure Host header is set to the original domain (for Cloud Run protection)
+  headers.set('Host', '${DOMAIN}');
   
   // Forward request to Cloud Run
   const modifiedRequest = new Request(cloudRunUrl, {

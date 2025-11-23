@@ -86,8 +86,16 @@ async function handleRequest(request) {
   // Cloud Run service URL
   const cloudRunUrl = 'CLOUD_RUN_URL_PLACEHOLDER' + url.pathname + url.search;
   
-  // Preserve original headers
-  const headers = new Headers(request.headers);
+  // Create new headers - preserve Cloudflare headers and add Host
+  const headers = new Headers();
+  
+  // Copy all original headers (including Cloudflare headers like CF-Connecting-IP, CF-Ray)
+  for (const [key, value] of request.headers) {
+    headers.set(key, value);
+  }
+  
+  // Ensure Host header is set to the original domain (for Cloud Run protection)
+  headers.set('Host', 'ALLOWED_HOST_PLACEHOLDER');
   
   // Forward request to Cloud Run
   const modifiedRequest = new Request(cloudRunUrl, {
@@ -117,6 +125,12 @@ EOF
 )
 
 WORKER_CODE="${WORKER_CODE//CLOUD_RUN_URL_PLACEHOLDER/$CLOUD_RUN_URL}"
+# Use first allowed host or full domain
+ALLOWED_HOST="${ALLOWED_HOSTS:-$FULL_DOMAIN}"
+if [ -z "$ALLOWED_HOST" ] || [ "$ALLOWED_HOST" == "$FULL_DOMAIN" ]; then
+    ALLOWED_HOST="$FULL_DOMAIN"
+fi
+WORKER_CODE="${WORKER_CODE//ALLOWED_HOST_PLACEHOLDER/$ALLOWED_HOST}"
 
 # Upload worker script
 UPLOAD_RESPONSE=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/${WORKER_NAME}" \

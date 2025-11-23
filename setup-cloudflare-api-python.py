@@ -75,6 +75,11 @@ def create_worker(account_id: str, worker_name: str, cloud_run_url: str) -> bool
     """Create or update Cloudflare Worker"""
     print(f"📦 Creating Worker: {worker_name}...")
     
+    # Get allowed host (use first from ALLOWED_HOSTS or domain)
+    allowed_host = ALLOWED_EMAIL_DOMAIN if ALLOWED_EMAIL_DOMAIN and not ALLOWED_EMAIL_DOMAIN.startswith('@') else DOMAIN
+    if SUBDOMAIN:
+        allowed_host = f"{SUBDOMAIN}.{DOMAIN}"
+    
     worker_code = f"""addEventListener('fetch', event => {{
   event.respondWith(handleRequest(event.request))
 }})
@@ -85,8 +90,16 @@ async function handleRequest(request) {{
   // Cloud Run service URL
   const cloudRunUrl = '{cloud_run_url}' + url.pathname + url.search;
   
-  // Preserve original headers
-  const headers = new Headers(request.headers);
+  // Create new headers - preserve Cloudflare headers and add Host
+  const headers = new Headers();
+  
+  // Copy all original headers (including Cloudflare headers like CF-Connecting-IP, CF-Ray)
+  for (const [key, value] of request.headers) {{
+    headers.set(key, value);
+  }}
+  
+  // Ensure Host header is set to the original domain (for Cloud Run protection)
+  headers.set('Host', '{allowed_host}');
   
   // Forward request to Cloud Run
   const modifiedRequest = new Request(cloudRunUrl, {{
