@@ -70,15 +70,54 @@ def index():
     return render_template(TEMPLATE_HOME)
 
 
+@main_bp.route('/debug/s3-files')
+def debug_s3_files():
+    """Debug endpoint to list files in S3 bucket"""
+    try:
+        s3_manager = get_s3_manager()
+        files = s3_manager.list_files()
+        return jsonify({
+            'bucket': Config.S3_BUCKET_NAME,
+            'files': files,
+            'count': len(files)
+        })
+    except Exception as e:
+        logger.error(f"Error listing S3 files: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/debug/test-csv/<filename>')
+def debug_test_csv(filename):
+    """Debug endpoint to test reading a CSV file from S3"""
+    try:
+        s3_manager = get_s3_manager()
+        df = s3_manager.read_csv(filename)
+        return jsonify({
+            'filename': filename,
+            'rows': len(df),
+            'columns': df.columns.tolist() if not df.empty else [],
+            'sample_data': df.head(5).to_dict(orient='records') if not df.empty else []
+        })
+    except Exception as e:
+        logger.error(f"Error reading CSV {filename}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @main_bp.route('/snapshot_report')
 def snapshot_report_page():
     """Snapshot report page - reads directly from S3"""
     try:
         s3_manager = get_s3_manager()
+        # Try different possible file names
         snapshot_reports_df = s3_manager.read_csv('combined_snapshot_reports.csv')
         if snapshot_reports_df.empty:
+            # Try alternative name
+            snapshot_reports_df = s3_manager.read_csv('snapshot_reports.csv')
+        if snapshot_reports_df.empty:
+            logger.warning("Snapshot reports file is empty or not found")
             return render_template(TEMPLATE_SNAPSHOT_REPORTS, table_data=[])
         table_data = snapshot_reports_df.to_dict(orient='records')
+        logger.info(f"Rendering snapshot report with {len(table_data)} records")
         return render_template(TEMPLATE_SNAPSHOT_REPORTS, table_data=table_data)
     except Exception as e:
         logger.error(f"Error in snapshot_report_page: {e}", exc_info=True)

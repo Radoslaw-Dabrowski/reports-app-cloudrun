@@ -58,13 +58,15 @@ class S3Manager:
                 return pd.DataFrame()
 
             df = pd.read_csv(StringIO(content), quotechar='"')
-            logger.info(f"Successfully read {len(df)} rows from {filename}")
+            logger.info(f"Successfully read {len(df)} rows and {len(df.columns)} columns from {filename}")
+            if len(df) > 0:
+                logger.debug(f"Columns in {filename}: {df.columns.tolist()[:10]}")  # Log first 10 columns
             return df
 
         except ClientError as e:
             error_code = e.response['Error']['Code']
             if error_code == 'NoSuchKey':
-                logger.error(f"{filename} does not exist in bucket {self.bucket_name}")
+                logger.error(f"{filename} does not exist in bucket {self.bucket_name}. Available files: {self.list_files()[:10]}")
             elif error_code == 'AllAccessDisabled':
                 logger.error(f"Access to bucket {self.bucket_name} is disabled")
             else:
@@ -76,7 +78,7 @@ class S3Manager:
             return pd.DataFrame()
 
         except Exception as e:
-            logger.error(f"Error reading {filename} from S3: {e}")
+            logger.error(f"Error reading {filename} from S3: {e}", exc_info=True)
             return pd.DataFrame()
 
     def write_csv(self, df: pd.DataFrame, filename: str) -> bool:
