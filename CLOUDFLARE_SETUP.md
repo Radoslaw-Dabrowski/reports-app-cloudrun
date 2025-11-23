@@ -20,28 +20,25 @@ Aby zabezpieczyć Cloud Run i dodać autentykację przez Cloudflare, potrzebujem
 
 ### Krok 2: Utwórz Cloud Run service dla Cloudflared
 
-Utwórz nowy Cloud Run service, który będzie uruchamiał cloudflared:
+**UWAGA:** Cloudflared tunnel nie nasłuchuje na porcie HTTP, więc Cloud Run może zgłaszać błędy. Użyj przygotowanego skryptu lub alternatywnego rozwiązania.
+
+**Opcja A: Użyj przygotowanego skryptu (zalecane)**
 
 ```bash
-# Utwórz Secret Manager secret dla tokenu
-echo -n "YOUR_TUNNEL_TOKEN" | gcloud secrets create cloudflared-token \
-  --data-file=- \
-  --project=gentle-breaker-469413-m6
-
-# Utwórz Cloud Run service dla cloudflared
-gcloud run deploy cloudflared-tunnel \
-  --image=cloudflare/cloudflared:latest \
-  --region=europe-west1 \
-  --project=gentle-breaker-469413-m6 \
-  --set-secrets=CLOUDFLARED_TOKEN=cloudflared-token:latest \
-  --args="tunnel,--no-autoupdate,run,--token,$(CLOUDFLARED_TOKEN)" \
-  --memory=256Mi \
-  --cpu=1 \
-  --min-instances=1 \
-  --max-instances=2 \
-  --timeout=3600 \
-  --service-account=299435740891-compute@developer.gserviceaccount.com
+cd /tmp/reports-app-cloudrun
+./setup-cloudflare.sh YOUR_TUNNEL_TOKEN
 ```
+
+**Opcja B: Alternatywne rozwiązanie - Cloudflare Workers**
+
+Jeśli Cloud Run nie działa z cloudflared, użyj Cloudflare Workers jako proxy (patrz Opcja 2 poniżej).
+
+**Opcja C: Uruchom cloudflared lokalnie lub na innym serwerze**
+
+Cloudflared może działać na dowolnym serwerze, nie musi być w Cloud Run. Możesz:
+- Uruchomić na swoim serwerze domowym
+- Użyć Cloud Run Jobs (zamiast Service)
+- Użyć Compute Engine VM
 
 ### Krok 3: Skonfiguruj Route w Cloudflare
 
@@ -72,7 +69,75 @@ gcloud run deploy cloudflared-tunnel \
      - Lub `Emails ending in` → `@twoja-firma.com`
 7. Kliknij **Add application**
 
-## Opcja 2: Cloudflare Workers (Alternatywa)
+## Opcja 2: Cloudflare Workers (Rekomendowane dla Cloud Run)
+
+Cloudflare Workers to lepsze rozwiązanie dla Cloud Run, ponieważ nie wymaga dodatkowego serwisu.
+
+### Krok 1: Utwórz Worker
+
+1. Zaloguj się do Cloudflare Dashboard
+2. Przejdź do **Workers & Pages**
+3. Kliknij **Create application** → **Create Worker**
+4. Nazwij: `reports-app-proxy`
+5. Wklej kod:
+
+```javascript
+// worker.js
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    
+    // Cloud Run service URL
+    const cloudRunUrl = 'https://reports-app-cloudrun-299435740891.europe-west1.run.app' + url.pathname + url.search;
+    
+    // Create new request with original headers
+    const headers = new Headers(request.headers);
+    
+    // Forward request to Cloud Run
+    const modifiedRequest = new Request(cloudRunUrl, {
+      method: request.method,
+      headers: headers,
+      body: request.body,
+      redirect: 'follow'
+    });
+    
+    try {
+      const response = await fetch(modifiedRequest);
+      
+      // Create new response with CORS headers if needed
+      const newHeaders = new Headers(response.headers);
+      newHeaders.set('X-Proxy', 'cloudflare-worker');
+      
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders
+      });
+    } catch (error) {
+      return new Response('Proxy error: ' + error.message, { status: 502 });
+    }
+  }
+};
+```
+
+6. Kliknij **Deploy**
+
+### Krok 2: Skonfiguruj Route
+
+1. W Worker → **Triggers**
+2. Dodaj **Custom Domain** lub użyj ***.workers.dev**
+3. Ustaw domenę: `reports.twoja-domena.com`
+
+### Krok 3: Skonfiguruj Cloudflare Access
+
+1. Cloudflare Dashboard → **Zero Trust** → **Access** → **Applications**
+2. **Add an application** → **Self-hosted**
+3. Skonfiguruj:
+   - **Application name**: `Reports App`
+   - **Application domain**: `reports.twoja-domena.com`
+   - **Policy**: Dodaj dozwolone emaile
+
+## Opcja 3: Cloudflare Tunnel (Alternatywa - jeśli Workers nie działa)
 
 Jeśli nie chcesz używać Tunnel, możesz użyć Cloudflare Workers jako proxy:
 

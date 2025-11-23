@@ -59,7 +59,10 @@ gcloud run deploy "$SERVICE_NAME" \
     --max-instances=2 \
     --timeout=3600 \
     --service-account=299435740891-compute@developer.gserviceaccount.com \
-    --no-allow-unauthenticated
+    --no-allow-unauthenticated \
+    --port=8080 \
+    --no-cpu-throttling \
+    --execution-environment=gen2
 
 echo ""
 echo "✅ Cloudflare Tunnel service deployed!"

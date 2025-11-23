@@ -1,0 +1,18 @@
+# Dockerfile for cloudflared with health check
+FROM cloudflare/cloudflared:latest
+
+# Create a simple health check script
+RUN echo '#!/bin/sh\n\
+# Health check - check if tunnel is running\n\
+if pgrep cloudflared > /dev/null; then\n\
+  exit 0\n\
+else\n\
+  exit 1\n\
+fi' > /healthcheck.sh && chmod +x /healthcheck.sh
+
+# Expose port for health check
+EXPOSE 8080
+
+# Start cloudflared tunnel
+ENTRYPOINT ["cloudflared", "tunnel", "--no-autoupdate", "run", "--token"]
+
