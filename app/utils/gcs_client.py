@@ -64,7 +64,7 @@ class GCSManager:
             DataFrame with CSV contents
         """
         try:
-            logger.info(f"Reading {filename} from GCS bucket {self.bucket_name}")
+            logger.info(f"[GCS] Reading {filename} from bucket {self.bucket_name}")
             blob = self.bucket.blob(filename)
             
             if not blob.exists():

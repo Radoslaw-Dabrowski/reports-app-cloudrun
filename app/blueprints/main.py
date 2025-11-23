@@ -88,14 +88,17 @@ def get_storage_manager():
             try:
                 # Check if GCS has data, if not fallback to S3
                 if gcs_manager.file_exists('report.csv'):
+                    logger.info(f"Using GCS as data source (bucket: {Config.GCS_BUCKET_NAME})")
                     return gcs_manager
                 else:
-                    logger.warning("GCS cache empty, falling back to S3")
+                    logger.warning(f"GCS cache empty (bucket: {Config.GCS_BUCKET_NAME}), falling back to S3")
             except Exception as e:
                 logger.warning(f"GCS error: {e}. Falling back to S3.")
         # Fallback to S3 if GCS is not available or has no data
+        logger.info(f"Using S3 as data source (bucket: {Config.S3_BUCKET_NAME})")
         return get_s3_manager()
     else:
+        logger.info(f"Using S3 as data source (DATA_SOURCE={Config.DATA_SOURCE}, bucket: {Config.S3_BUCKET_NAME})")
         return get_s3_manager()
 
 

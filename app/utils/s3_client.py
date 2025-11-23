@@ -49,7 +49,7 @@ class S3Manager:
             DataFrame with CSV contents
         """
         try:
-            logger.info(f"Reading {filename} from S3 bucket {self.bucket_name}")
+            logger.info(f"[S3] Reading {filename} from bucket {self.bucket_name}")
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=filename)
             content = response['Body'].read().decode('utf-8')
 
