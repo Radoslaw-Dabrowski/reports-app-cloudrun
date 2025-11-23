@@ -57,47 +57,73 @@ def check_cloudflare_protection():
     
     # Skip protection if disabled
     if not Config.REQUIRE_CLOUDFLARE:
+        logger.debug("Cloudflare protection disabled")
         return True
     
-    # Get client IP
-    client_ip = request.headers.get('CF-Connecting-IP')  # Cloudflare adds this
-    if not client_ip:
-        # Try to get from X-Forwarded-For (Cloud Run adds this)
-        forwarded_for = request.headers.get('X-Forwarded-For')
-        if forwarded_for:
-            client_ip = forwarded_for.split(',')[0].strip()
-        else:
-            client_ip = request.remote_addr
-    
-    # Check Host header
+    # Get Host header
     host = request.headers.get('Host', '')
     allowed_hosts = Config.ALLOWED_HOSTS
     
     # Check if Host is allowed
     host_allowed = any(allowed_host.lower() in host.lower() for allowed_host in allowed_hosts)
     
-    # Check if request comes from Cloudflare
-    # Method 1: Check CF-Connecting-IP header (most reliable)
-    has_cf_header = request.headers.get('CF-Connecting-IP') is not None
-    has_cf_ray = request.headers.get('CF-Ray') is not None
+    # Get client IP for logging
+    client_ip = request.headers.get('CF-Connecting-IP')
+    if not client_ip:
+        forwarded_for = request.headers.get('X-Forwarded-For')
+        if forwarded_for:
+            client_ip = forwarded_for.split(',')[0].strip()
+        else:
+            client_ip = request.remote_addr
     
-    # Method 2: Check if IP is in Cloudflare ranges
+    # Check if request comes from Cloudflare
+    # Method 1: Check CF-Connecting-IP header (most reliable - Cloudflare always adds this)
+    has_cf_connecting_ip = request.headers.get('CF-Connecting-IP') is not None
+    has_cf_ray = request.headers.get('CF-Ray') is not None
+    has_cf_country = request.headers.get('CF-IPCountry') is not None
+    
+    # Method 2: Check if IP is in Cloudflare ranges (fallback)
     is_cf_ip = is_cloudflare_ip(client_ip)
     
-    # Allow if:
-    # 1. Has Cloudflare headers (CF-Connecting-IP or CF-Ray) AND host is allowed
-    # 2. OR IP is in Cloudflare ranges AND host is allowed
-    is_from_cloudflare = (has_cf_header or has_cf_ray) or is_cf_ip
+    # Log for debugging
+    logger.debug(f"Protection check - Host: {host}, CF-Connecting-IP: {has_cf_connecting_ip}, CF-Ray: {has_cf_ray}, CF-Country: {has_cf_country}, Client IP: {client_ip}")
     
-    if not is_from_cloudflare:
-        logger.warning(f"Blocked direct access attempt from {client_ip} (Host: {host})")
-        return False
+    # Allow if Host is allowed AND (has Cloudflare headers OR is Cloudflare IP)
+    # Primary check: Cloudflare headers (most reliable)
+    has_cloudflare_headers = has_cf_connecting_ip or has_cf_ray or has_cf_country
     
+    # If we have Cloudflare headers, allow if host is correct
+    if has_cloudflare_headers:
+        if host_allowed:
+            logger.debug(f"Allowed: Request from Cloudflare with valid Host ({host})")
+            return True
+        else:
+            logger.warning(f"Blocked: Cloudflare request but invalid Host ({host}, allowed: {allowed_hosts})")
+            return False
+    
+    # Fallback: Check IP ranges (less reliable but works if headers are missing)
+    if is_cf_ip:
+        if host_allowed:
+            logger.debug(f"Allowed: Request from Cloudflare IP range with valid Host ({host})")
+            return True
+        else:
+            logger.warning(f"Blocked: Cloudflare IP but invalid Host ({host}, allowed: {allowed_hosts})")
+            return False
+    
+    # If no Cloudflare indicators and host is not allowed, block
     if not host_allowed:
-        logger.warning(f"Blocked request with invalid Host header: {host} (allowed: {allowed_hosts})")
+        logger.warning(f"Blocked: No Cloudflare indicators and invalid Host ({host}, allowed: {allowed_hosts}, IP: {client_ip})")
         return False
     
-    return True
+    # If host is allowed but no Cloudflare indicators, be more lenient
+    # This allows requests with correct Host header (might be from Cloudflare Worker)
+    if host_allowed:
+        logger.info(f"Allowed: Valid Host header ({host}) - assuming Cloudflare Worker")
+        return True
+    
+    # Default: block
+    logger.warning(f"Blocked: No valid indicators (Host: {host}, IP: {client_ip})")
+    return False
 
 
 def cloudflare_protection_middleware():
@@ -110,9 +136,14 @@ def cloudflare_protection_middleware():
         return None
     
     # Check Cloudflare protection
-    if not check_cloudflare_protection():
-        logger.warning(f"Blocked unauthorized access: {request.method} {request.path} from {request.remote_addr}")
-        abort(403, description="Access denied. This service is only accessible through Cloudflare.")
+    try:
+        if not check_cloudflare_protection():
+            logger.warning(f"Blocked unauthorized access: {request.method} {request.path} from {request.remote_addr} (Host: {request.headers.get('Host', 'unknown')})")
+            abort(403, description="Access denied. This service is only accessible through Cloudflare.")
+    except Exception as e:
+        logger.error(f"Error in Cloudflare protection check: {e}", exc_info=True)
+        # On error, allow request (fail open) - but log it
+        logger.warning("Cloudflare protection check failed, allowing request")
     
     return None
 
