@@ -120,17 +120,12 @@ def check_cloudflare_protection():
         logger.warning(f"Blocked: No Cloudflare indicators and invalid Host ({host}, allowed: {allowed_hosts}, IP: {client_ip})")
         return False
     
-    # If host is allowed but no Cloudflare indicators, check if it's a direct Cloud Run URL
-    # Block direct Cloud Run URLs even if they somehow have the correct Host header
+    # STRICT: If host is allowed but no Cloudflare indicators, block
+    # This ensures that only requests from Cloudflare (with headers) are allowed
+    # Even if Host header is correct, we require Cloudflare headers for security
     if host_allowed:
-        # If Host is the Cloud Run URL itself, block it (direct access)
-        if 'run.app' in host or 'cloudfunctions.net' in host:
-            logger.warning(f"Blocked: Direct Cloud Run access with spoofed Host header ({host}, IP: {client_ip})")
-            return False
-        # If Host is the allowed domain but no Cloudflare headers, allow (might be from Worker without headers)
-        # BUT: This is less secure - prefer to require Cloudflare headers
-        logger.info(f"Allowed: Valid Host header ({host}) but no Cloudflare headers - less secure")
-        return True
+        logger.warning(f"Blocked: Valid Host ({host}) but missing Cloudflare headers (IP: {client_ip}). Worker may not be configured correctly.")
+        return False
     
     # Default: block
     logger.warning(f"Blocked: No valid indicators (Host: {host}, IP: {client_ip})")
@@ -142,8 +137,8 @@ def cloudflare_protection_middleware():
     Flask middleware to protect against direct access.
     Add this as @app.before_request
     """
-    # Allow health checks
-    if request.path in ['/health', '/ready']:
+    # Allow health checks (but still check Cloudflare for /ready)
+    if request.path == '/health':
         return None
     
     # Check Cloudflare protection
@@ -153,8 +148,9 @@ def cloudflare_protection_middleware():
             abort(403, description="Access denied. This service is only accessible through Cloudflare.")
     except Exception as e:
         logger.error(f"Error in Cloudflare protection check: {e}", exc_info=True)
-        # On error, allow request (fail open) - but log it
-        logger.warning("Cloudflare protection check failed, allowing request")
+        # On error, block request (fail closed) for security
+        logger.warning("Cloudflare protection check failed, blocking request")
+        abort(403, description="Access denied. Security check failed.")
     
     return None
 
