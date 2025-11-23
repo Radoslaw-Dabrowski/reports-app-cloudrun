@@ -81,19 +81,39 @@ def get_storage_manager():
     """
     Get storage manager - prefers GCS if available, falls back to S3.
     This reduces AWS egress costs by using GCS as cache.
+    
+    If FORCE_GCS_ONLY is True, will raise an error if GCS is not available.
     """
-    if Config.DATA_SOURCE == 'gcs':
+    # Force GCS only mode - fail if GCS is not available
+    if Config.FORCE_GCS_ONLY:
+        gcs_manager = get_gcs_manager()
+        if gcs_manager is None:
+            raise RuntimeError("FORCE_GCS_ONLY is enabled but GCS is not available. Install google-cloud-storage package.")
+        if not gcs_manager.file_exists('report.csv'):
+            raise RuntimeError(f"FORCE_GCS_ONLY is enabled but GCS bucket {Config.GCS_BUCKET_NAME} is empty. Please run 'Refresh Data' first.")
+        logger.info(f"[FORCED] Using GCS as data source (bucket: {Config.GCS_BUCKET_NAME})")
+        return gcs_manager
+    
+    # Normal mode - prefer GCS, fallback to S3
+    if Config.DATA_SOURCE == 'gcs' or Config.DATA_SOURCE == 'gcs-only':
         gcs_manager = get_gcs_manager()
         if gcs_manager is not None:
             try:
-                # Check if GCS has data, if not fallback to S3
+                # Check if GCS has data, if not fallback to S3 (unless gcs-only)
                 if gcs_manager.file_exists('report.csv'):
                     logger.info(f"Using GCS as data source (bucket: {Config.GCS_BUCKET_NAME})")
                     return gcs_manager
                 else:
+                    if Config.DATA_SOURCE == 'gcs-only':
+                        raise RuntimeError(f"GCS-only mode enabled but bucket {Config.GCS_BUCKET_NAME} is empty. Please run 'Refresh Data' first.")
                     logger.warning(f"GCS cache empty (bucket: {Config.GCS_BUCKET_NAME}), falling back to S3")
             except Exception as e:
+                if Config.DATA_SOURCE == 'gcs-only':
+                    raise RuntimeError(f"GCS-only mode enabled but error occurred: {e}")
                 logger.warning(f"GCS error: {e}. Falling back to S3.")
+        else:
+            if Config.DATA_SOURCE == 'gcs-only':
+                raise RuntimeError("GCS-only mode enabled but GCS is not available. Install google-cloud-storage package.")
         # Fallback to S3 if GCS is not available or has no data
         logger.info(f"Using S3 as data source (bucket: {Config.S3_BUCKET_NAME})")
         return get_s3_manager()
@@ -254,19 +274,28 @@ def debug_storage_info():
             except:
                 pass
         
+        # Check if S3 is being used (should be False if GCS-only)
+        s3_used = source_type == "S3"
+        force_gcs_only = Config.FORCE_GCS_ONLY
+        
         return jsonify({
             'current_source': source_type,
             'current_bucket': bucket_name,
             'data_source_config': Config.DATA_SOURCE,
+            'force_gcs_only': force_gcs_only,
             'gcs_available': gcs_available,
             'gcs_has_data': gcs_has_data,
             'gcs_bucket': Config.GCS_BUCKET_NAME,
             's3_bucket': Config.S3_BUCKET_NAME,
+            's3_used': s3_used,
+            's3_blocked': force_gcs_only or Config.DATA_SOURCE == 'gcs-only',
             'file_count': len(all_files),
             'csv_count': len(csv_files),
             'key_files_status': file_status,
             'sample_files': csv_files[:20],
-            'message': f'Currently using {source_type} (bucket: {bucket_name})'
+            'message': f'Currently using {source_type} (bucket: {bucket_name})',
+            'warning': 'S3 is being used!' if s3_used and not force_gcs_only else None,
+            'status': 'GCS_ONLY' if source_type == 'GCS' and (force_gcs_only or Config.DATA_SOURCE == 'gcs-only') else ('GCS' if source_type == 'GCS' else 'S3_FALLBACK')
         })
     except Exception as e:
         logger.error(f"Error in debug_storage_info: {e}", exc_info=True)

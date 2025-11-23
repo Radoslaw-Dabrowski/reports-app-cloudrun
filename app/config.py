@@ -42,7 +42,9 @@ class Config:
     GCP_PROJECT_ID = os.getenv('GCP_PROJECT_ID', os.getenv('GOOGLE_CLOUD_PROJECT'))
     
     # Data source preference: 'gcs' (default) or 's3'
+    # Set to 'gcs-only' to force GCS and fail if GCS is not available
     DATA_SOURCE = os.getenv('DATA_SOURCE', 'gcs')
+    FORCE_GCS_ONLY = os.getenv('FORCE_GCS_ONLY', 'false').lower() == 'true'
 
     # Redis Cache (Cloud Memorystore)
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
