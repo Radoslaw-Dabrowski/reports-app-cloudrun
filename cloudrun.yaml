@@ -1,0 +1,132 @@
+# Cloud Run service configuration
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: reports-app
+  labels:
+    app: reports-app
+    environment: production
+spec:
+  template:
+    metadata:
+      annotations:
+        # Autoscaling configuration
+        autoscaling.knative.dev/minScale: "0"  # Scale to zero when idle
+        autoscaling.knative.dev/maxScale: "10"  # Maximum instances
+        autoscaling.knative.dev/target: "80"  # Target concurrent requests per instance
+        
+        # Cloud SQL connection (if using Cloud SQL)
+        # run.googleapis.com/cloudsql-instances: PROJECT_ID:REGION:INSTANCE_NAME
+        
+        # VPC connector (if using VPC)
+        # run.googleapis.com/vpc-access-connector: projects/PROJECT_ID/locations/REGION/connectors/CONNECTOR_NAME
+        # run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      serviceAccountName: reports-app-sa  # Service account for Cloud Run
+      
+      containerConcurrency: 80  # Max concurrent requests per container
+      timeoutSeconds: 300  # 5 minute timeout
+      
+      containers:
+      - name: reports-app
+        image: gcr.io/PROJECT_ID/reports-app:latest
+        
+        ports:
+        - name: http1
+          containerPort: 8080
+        
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        
+        - name: PORT
+          value: "8080"
+        
+        # Database configuration (from Secret Manager)
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-db-host
+              key: latest
+        
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-db-name
+              key: latest
+        
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-db-user
+              key: latest
+        
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-db-password
+              key: latest
+        
+        # AWS S3 configuration
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-aws-access-key
+              key: latest
+        
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-aws-secret-key
+              key: latest
+        
+        - name: S3_BUCKET_NAME
+          value: "dhc-reports"
+        
+        # Redis/Memorystore configuration
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: reports-app-redis-host
+              key: latest
+        
+        - name: ENABLE_CACHE
+          value: "true"
+        
+        - name: CACHE_TTL
+          value: "3600"
+        
+        resources:
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+          requests:
+            cpu: "1"
+            memory: "512Mi"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          failureThreshold: 30
+          periodSeconds: 10
+
+  traffic:
+  - percent: 100
+    latestRevision: true

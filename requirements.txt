@@ -1,0 +1,31 @@
+# Core Framework
+Flask==3.0.0
+Werkzeug==3.0.1
+gunicorn==21.2.0
+
+# Data Processing
+pandas==2.1.4
+numpy==1.26.2
+
+# AWS S3
+boto3==1.34.10
+
+# Database
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.25
+
+# Utilities
+pytz==2023.3
+requests==2.31.0
+beautifulsoup4==4.12.2
+cryptography==41.0.7
+
+# Cloud Run optimizations
+Flask-Caching==2.1.0
+redis==5.0.1
+
+# Monitoring (optional for Cloud Run)
+google-cloud-logging==3.9.0
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-instrumentation-flask==0.43b0
