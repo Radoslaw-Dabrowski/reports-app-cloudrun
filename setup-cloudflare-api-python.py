@@ -75,41 +75,43 @@ def create_worker(account_id: str, worker_name: str, cloud_run_url: str) -> bool
     """Create or update Cloudflare Worker"""
     print(f"📦 Creating Worker: {worker_name}...")
     
-    worker_code = f"""export default {{
-  async fetch(request, env) {{
-    const url = new URL(request.url);
+    worker_code = f"""addEventListener('fetch', event => {{
+  event.respondWith(handleRequest(event.request))
+}})
+
+async function handleRequest(request) {{
+  const url = new URL(request.url);
+  
+  // Cloud Run service URL
+  const cloudRunUrl = '{cloud_run_url}' + url.pathname + url.search;
+  
+  // Preserve original headers
+  const headers = new Headers(request.headers);
+  
+  // Forward request to Cloud Run
+  const modifiedRequest = new Request(cloudRunUrl, {{
+    method: request.method,
+    headers: headers,
+    body: request.body,
+    redirect: 'follow'
+  }});
+  
+  try {{
+    const response = await fetch(modifiedRequest);
     
-    // Cloud Run service URL
-    const cloudRunUrl = '{cloud_run_url}' + url.pathname + url.search;
+    // Return response with additional headers
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('X-Proxy', 'cloudflare-worker');
     
-    // Preserve original headers
-    const headers = new Headers(request.headers);
-    
-    // Forward request to Cloud Run
-    const modifiedRequest = new Request(cloudRunUrl, {{
-      method: request.method,
-      headers: headers,
-      body: request.body,
-      redirect: 'follow'
+    return new Response(response.body, {{
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders
     }});
-    
-    try {{
-      const response = await fetch(modifiedRequest);
-      
-      // Return response with additional headers
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set('X-Proxy', 'cloudflare-worker');
-      
-      return new Response(response.body, {{
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders
-      }});
-    }} catch (error) {{
-      return new Response('Proxy error: ' + error.message, {{ status: 502 }});
-    }}
+  }} catch (error) {{
+    return new Response('Proxy error: ' + error.message, {{ status: 502 }});
   }}
-}};"""
+}}"""
     
     # Upload worker script (using PUT for create/update)
     url = f"{BASE_URL}/accounts/{account_id}/workers/scripts/{worker_name}"
