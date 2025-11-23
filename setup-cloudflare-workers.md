@@ -13,41 +13,43 @@ Cloud Run wymaga, aby kontener nasłuchiwał na porcie HTTP. Cloudflared tunnel 
 5. Wklej kod:
 
 ```javascript
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request))
+})
+
+async function handleRequest(request) {
+  const url = new URL(request.url);
+  
+  // Cloud Run service URL
+  const cloudRunUrl = 'https://reports-app-cloudrun-299435740891.europe-west1.run.app' + url.pathname + url.search;
+  
+  // Preserve original headers
+  const headers = new Headers(request.headers);
+  
+  // Forward request to Cloud Run
+  const modifiedRequest = new Request(cloudRunUrl, {
+    method: request.method,
+    headers: headers,
+    body: request.body,
+    redirect: 'follow'
+  });
+  
+  try {
+    const response = await fetch(modifiedRequest);
     
-    // Cloud Run service URL
-    const cloudRunUrl = 'https://reports-app-cloudrun-299435740891.europe-west1.run.app' + url.pathname + url.search;
+    // Return response with additional headers
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('X-Proxy', 'cloudflare-worker');
     
-    // Preserve original headers
-    const headers = new Headers(request.headers);
-    
-    // Forward request to Cloud Run
-    const modifiedRequest = new Request(cloudRunUrl, {
-      method: request.method,
-      headers: headers,
-      body: request.body,
-      redirect: 'follow'
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders
     });
-    
-    try {
-      const response = await fetch(modifiedRequest);
-      
-      // Return response with additional headers
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set('X-Proxy', 'cloudflare-worker');
-      
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders
-      });
-    } catch (error) {
-      return new Response('Proxy error: ' + error.message, { status: 502 });
-    }
+  } catch (error) {
+    return new Response('Proxy error: ' + error.message, { status: 502 });
   }
-};
+}
 ```
 
 6. Kliknij **Deploy**
