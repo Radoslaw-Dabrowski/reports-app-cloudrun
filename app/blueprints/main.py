@@ -105,10 +105,13 @@ def create_table_data(filtered_df, month, year, exclude_missing, frequencies_df,
             specific_days = ''
         
         # Get delivered dates
+        delivered_dates = []
         if 'date' in group.columns and 'attachment' in group.columns:
-            delivered_dates = group[group['attachment'] == 'Yes']['date'].dt.date.tolist()
-        else:
-            delivered_dates = []
+            try:
+                delivered_dates = group[group['attachment'] == 'Yes']['date'].dt.date.tolist()
+            except Exception as e:
+                logger.warning(f"Error extracting delivered dates: {e}")
+                delivered_dates = []
         has_delivered = bool(delivered_dates)
         
         for day in days_columns:
@@ -672,7 +675,87 @@ def monthly_report_page():
     frequencies_df = s3_manager.read_csv('frequencies.csv')
     customer_location_df = s3_manager.read_csv('customer_locations.csv')
     
+    if reports_df.empty:
+        logger.warning("report.csv is empty")
+        return render_template(
+            TEMPLATE_MONTHLY_REPORTS,
+            table_data=pd.DataFrame(),
+            days_columns=[],
+            weekend_columns=[],
+            today_day=None,
+            customers=[],
+            locations=[],
+            reports=[],
+            selected_customer=selected_customer,
+            selected_location=selected_location,
+            selected_report=selected_report,
+            selected_month=month,
+            selected_year=year,
+            selected_month_name=pd.to_datetime(f'{year}-{month:02}-01').strftime('%B'),
+            exclude_missing=exclude_missing,
+            frequencies_data=[]
+        )
+    
+    # Normalize column names - find actual column names and create normalized versions
+    customer_col = None
+    location_col = None
+    report_name_col = None
+    date_col = None
+    attachment_col = None
+    
+    for col in ['customer', 'Customer', 'CUSTOMER']:
+        if col in reports_df.columns:
+            customer_col = col
+            break
+    for col in ['location', 'Location', 'LOCATION']:
+        if col in reports_df.columns:
+            location_col = col
+            break
+    for col in ['report name', 'report_name', 'Report Name', 'REPORT_NAME']:
+        if col in reports_df.columns:
+            report_name_col = col
+            break
+    for col in ['date', 'Date', 'DATE']:
+        if col in reports_df.columns:
+            date_col = col
+            break
+    for col in ['attachment', 'Attachment', 'ATTACHMENT']:
+        if col in reports_df.columns:
+            attachment_col = col
+            break
+    
+    if not customer_col or not location_col or not report_name_col:
+        logger.error(f"Missing required columns in report.csv. Available: {reports_df.columns.tolist()}")
+        return render_template(
+            TEMPLATE_MONTHLY_REPORTS,
+            table_data=pd.DataFrame(),
+            days_columns=[],
+            weekend_columns=[],
+            today_day=None,
+            customers=[],
+            locations=[],
+            reports=[],
+            selected_customer=selected_customer,
+            selected_location=selected_location,
+            selected_report=selected_report,
+            selected_month=month,
+            selected_year=year,
+            selected_month_name=pd.to_datetime(f'{year}-{month:02}-01').strftime('%B'),
+            exclude_missing=exclude_missing,
+            frequencies_data=[]
+        )
+    
+    # Create normalized copy with standard column names
     filtered_df = reports_df.copy()
+    filtered_df['customer'] = filtered_df[customer_col]
+    filtered_df['location'] = filtered_df[location_col]
+    filtered_df['report name'] = filtered_df[report_name_col]
+    if date_col:
+        filtered_df['date'] = filtered_df[date_col]
+    if attachment_col:
+        filtered_df['attachment'] = filtered_df[attachment_col]
+    
+    # Apply filters
     if selected_customer != 'All Customers':
         filtered_df = filtered_df[filtered_df['customer'] == selected_customer]
     if selected_location != 'All Locations':
@@ -683,7 +766,7 @@ def monthly_report_page():
     if exclude_missing:
         filtered_df = filtered_df[~filtered_df.apply(lambda row: row.str.contains('Missing').any(), axis=1)]
     
-    customers = filtered_df['customer'].unique() if 'customer' in filtered_df.columns else []
+    customers = filtered_df['customer'].unique()
     # Get locations from customer_location_df
     loc_col = None
     for col in ['location', 'Location', 'LOCATION']:
@@ -691,7 +774,7 @@ def monthly_report_page():
             loc_col = col
             break
     locations = customer_location_df[loc_col].unique() if loc_col else []
-    reports = filtered_df['report name'].unique() if 'report name' in filtered_df.columns else []
+    reports = filtered_df['report name'].unique()
     
     # Create table data using the create_table_data function
     table_data, days_columns, weekend_columns, today_day = create_table_data(
