@@ -75,11 +75,22 @@ def debug_s3_files():
     """Debug endpoint to list files in S3 bucket"""
     try:
         s3_manager = get_s3_manager()
-        files = s3_manager.list_files()
+        all_files = s3_manager.list_files()
+        csv_files = [f for f in all_files if f.endswith('.csv')]
+        
+        # Also check common prefixes/folders
+        prefixes = ['', 'reports/', 'data/', 'csv/']
+        files_by_prefix = {}
+        for prefix in prefixes:
+            files_by_prefix[prefix or 'root'] = s3_manager.list_files(prefix=prefix)
+        
         return jsonify({
             'bucket': Config.S3_BUCKET_NAME,
-            'files': files,
-            'count': len(files)
+            'all_files': all_files[:50],  # First 50 files
+            'csv_files': csv_files[:50],
+            'count': len(all_files),
+            'csv_count': len(csv_files),
+            'files_by_prefix': {k: v[:20] for k, v in files_by_prefix.items()}
         })
     except Exception as e:
         logger.error(f"Error listing S3 files: {e}", exc_info=True)
