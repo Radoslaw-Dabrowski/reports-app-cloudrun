@@ -683,9 +683,15 @@ def monthly_report_page():
     if exclude_missing:
         filtered_df = filtered_df[~filtered_df.apply(lambda row: row.str.contains('Missing').any(), axis=1)]
     
-    customers = reports_df['customer'].unique() if 'customer' in reports_df.columns else []
-    locations = customer_location_df['location'].unique() if 'location' in customer_location_df.columns else []
-    reports = reports_df['report name'].unique() if 'report name' in reports_df.columns else []
+    customers = filtered_df['customer'].unique() if 'customer' in filtered_df.columns else []
+    # Get locations from customer_location_df
+    loc_col = None
+    for col in ['location', 'Location', 'LOCATION']:
+        if col in customer_location_df.columns:
+            loc_col = col
+            break
+    locations = customer_location_df[loc_col].unique() if loc_col else []
+    reports = filtered_df['report name'].unique() if 'report name' in filtered_df.columns else []
     
     # Create table data using the create_table_data function
     table_data, days_columns, weekend_columns, today_day = create_table_data(
