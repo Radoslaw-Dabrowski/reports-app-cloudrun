@@ -224,11 +224,61 @@ def index():
     return render_template(TEMPLATE_HOME)
 
 
-@main_bp.route('/debug/s3-files')
-def debug_s3_files():
-    """Debug endpoint to list files in S3 bucket"""
+@main_bp.route('/debug/storage-info')
+def debug_storage_info():
+    """Debug endpoint to show current storage source and files"""
     try:
         storage_manager = get_storage_manager()
+        source_type = "GCS" if isinstance(storage_manager, GCSManager) else "S3"
+        bucket_name = Config.GCS_BUCKET_NAME if source_type == "GCS" else Config.S3_BUCKET_NAME
+        
+        all_files = storage_manager.list_files()
+        csv_files = [f for f in all_files if f.endswith('.csv')]
+        
+        # Check if key files exist
+        key_files = ['report.csv', 'frequencies.csv', 'customer_locations.csv']
+        file_status = {}
+        for key_file in key_files:
+            try:
+                file_status[key_file] = storage_manager.file_exists(key_file)
+            except Exception as e:
+                file_status[key_file] = f"Error: {str(e)}"
+        
+        # Check GCS availability
+        gcs_manager = get_gcs_manager()
+        gcs_available = gcs_manager is not None
+        gcs_has_data = False
+        if gcs_available:
+            try:
+                gcs_has_data = gcs_manager.file_exists('report.csv')
+            except:
+                pass
+        
+        return jsonify({
+            'current_source': source_type,
+            'current_bucket': bucket_name,
+            'data_source_config': Config.DATA_SOURCE,
+            'gcs_available': gcs_available,
+            'gcs_has_data': gcs_has_data,
+            'gcs_bucket': Config.GCS_BUCKET_NAME,
+            's3_bucket': Config.S3_BUCKET_NAME,
+            'file_count': len(all_files),
+            'csv_count': len(csv_files),
+            'key_files_status': file_status,
+            'sample_files': csv_files[:20],
+            'message': f'Currently using {source_type} (bucket: {bucket_name})'
+        })
+    except Exception as e:
+        logger.error(f"Error in debug_storage_info: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@main_bp.route('/debug/s3-files')
+def debug_s3_files():
+    """Debug endpoint to list files in storage (GCS or S3)"""
+    try:
+        storage_manager = get_storage_manager()
+        source_type = "GCS" if isinstance(storage_manager, GCSManager) else "S3"
         all_files = storage_manager.list_files()
         csv_files = [f for f in all_files if f.endswith('.csv')]
         
@@ -238,10 +288,11 @@ def debug_s3_files():
         for prefix in prefixes:
             files_by_prefix[prefix or 'root'] = storage_manager.list_files(prefix=prefix)
         
-        bucket_name = Config.GCS_BUCKET_NAME if Config.DATA_SOURCE == 'gcs' else Config.S3_BUCKET_NAME
+        bucket_name = Config.GCS_BUCKET_NAME if source_type == "GCS" else Config.S3_BUCKET_NAME
         return jsonify({
             'bucket': bucket_name,
-            'source': Config.DATA_SOURCE,
+            'source': source_type,
+            'data_source_config': Config.DATA_SOURCE,
             'all_files': all_files[:50],  # First 50 files
             'csv_files': csv_files[:50],
             'count': len(all_files),
@@ -249,7 +300,7 @@ def debug_s3_files():
             'files_by_prefix': {k: v[:20] for k, v in files_by_prefix.items()}
         })
     except Exception as e:
-        logger.error(f"Error listing S3 files: {e}", exc_info=True)
+        logger.error(f"Error listing files: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
