@@ -1,0 +1,105 @@
+{% block content %}
+<div class="container">
+    <h1 class="my-4">Manage Exclusions</h1>
+    
+    <!-- Existing table of exclusions -->
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Network</th>
+                <th>Location</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exclusion in exclusion_list %}
+                {% if exclusion['Network'] and exclusion['Location'] %}
+                <tr>
+                    <td>{{ exclusion['Network'] }}</td>
+                    <td>{{ exclusion['Location'] }}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="removeExclusion('{{ exclusion['Network'] }}', '{{ exclusion['Location'] }}')">Delete</button>
+                    </td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Form to add a new exclusion -->
+    <form id="addExclusionForm" method="POST" action="/add_exclusion">
+        <div class="form-group">
+            <label for="networkInput">Network:</label>
+            <input type="text" id="networkInput" name="network" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label for="locationInput">Location:</label>
+            <input type="text" id="locationInput" name="location" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Exclusion</button>
+    </form>
+
+    <!-- Flash messages for feedback -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-info mt-4">
+                <ul>
+                    {% for message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- JavaScript for Exclusion Management -->
+    <script>
+        function removeExclusion(network, location) {
+            fetch('/remove_exclusion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ network, location })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('Exclusion removed successfully.');
+                    window.location.reload();  // Reload the page after deletion
+                } else {
+                    alert('Error removing exclusion.');
+                }
+            });
+        }
+
+        // Handle the form submission to add a new exclusion
+        document.getElementById('addExclusionForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent the default form submission
+
+            const network = document.getElementById('networkInput').value.trim();
+            const location = document.getElementById('locationInput').value.trim();
+
+            if (network && location) {
+                fetch('/add_exclusion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `network=${encodeURIComponent(network)}&location=${encodeURIComponent(location)}`
+                })
+                .then(response => {
+                    if (response.ok) {
+                        alert('Exclusion added successfully.');
+                        window.location.reload();  // Reload the page after adding
+                    } else {
+                        alert('Error adding exclusion.');
+                    }
+                });
+            } else {
+                alert('Please fill in both Network and Location.');
+            }
+        });
+    </script>
+</div>
+{% endblock %}

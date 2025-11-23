@@ -1,0 +1,864 @@
+/* Base Styles */
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    font-family: 'Inter', sans-serif;
+    background-color: #f4f5f7;
+    color: #333;
+}
+
+.floating-checkbox-list {
+    position: fixed;
+    top: 20%;
+    right: 20px;
+    z-index: 1000;
+    padding: 15px;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    max-width: 300px;
+    max-height: 400px; /* Limit the height */
+    overflow-y: auto; /* Add vertical scrollbar */
+    display: none; /* Initially hidden */
+}
+
+.check-group {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgb(0 0 10 / 0.2);
+}
+
+.checkbox {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.checkbox__input {
+    position: absolute;
+    width: 1.375em;
+    height: 1.375em;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.checkbox__input:checked + .checkbox__icon .tick {
+    stroke-dashoffset: 0;
+}
+
+.checkbox__icon {
+    width: 1.375em;
+    height: 1.375em;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.checkbox__icon .tick {
+    stroke-dasharray: 20px;
+    stroke-dashoffset: 20px;
+    transition: stroke-dashoffset .2s ease-out;
+}
+
+.checkbox__label {
+    margin-left: 0.5em;
+}
+
+.form-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.ks-cboxtags {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    gap: 10px;
+}
+
+.ks-cboxtags li {
+    display: inline;
+}
+
+.ks-cboxtags li label {
+    display: inline-block;
+    background-color: rgba(240, 240, 240, .9);
+    border: 2px solid rgba(100, 100, 100, .3);
+    color: #333;
+    border-radius: 25px;
+    white-space: nowrap;
+    margin: 3px 0px;
+    cursor: pointer;
+    padding: 8px 12px;
+    transition: all .2s;
+}
+
+.ks-cboxtags li label::before {
+    content: "\f067";
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 12px;
+    padding: 2px 6px 2px 2px;
+    transition: transform .3s ease-in-out;
+}
+
+.ks-cboxtags li input[type="checkbox"]:checked + label::before {
+    content: "\f00c";
+    transform: rotate(-360deg);
+}
+
+.ks-cboxtags li input[type="checkbox"]:checked + label {
+    border: 2px solid #007bff;
+    background-color: #007bff;
+    color: #fff;
+}
+
+.ks-cboxtags li input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.color-legend {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 0.9em;
+}
+
+/* Sidebar Styles */
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.nav-link {
+    color: #ffffff;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.nav-link.disabled {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Content Area */
+.content {
+    margin-left: 300px; /* Start content after the sidebar */
+    overflow-y: auto;
+    height: 100vh;
+    padding: 20px;
+    background-color: #ffffff;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Filter Container */
+.filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.search-box {
+    margin-left: 20px;
+    padding: 5px;
+    font-size: 16px;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin: 0 auto; /* Center the table if it's not taking full width */
+}
+.vhealth-table-container table {
+    table-layout: fixed; /* Prevents the table from resizing */
+    width: 100%; /* Ensures the table takes full width */
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: #f2f2f2;
+}
+
+.table th {
+    background-color: #007bff;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.table-bordered {
+    border: 1px solid #dddddd;
+}
+
+.table-bordered th, .table-bordered td {
+    border: 1px solid #dddddd;
+}
+
+.table-today {
+    background-color: #ffc107 !important;
+    color: black;
+}
+
+.table-secondary {
+    background-color: #e2e3e5 !important;
+}
+
+.table-success {
+    background-color: #d4edda !important;
+    color: #155724;
+}
+
+.table-danger {
+    background-color: #f8d7da !important;
+    color: #721c24;
+}
+
+.yellow {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Legend Styles */
+.legend {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    width: 220px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    z-index: 1000;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.legend .btn-close {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.legend ul {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 20px;
+}
+
+.legend li {
+    margin-bottom: 5px;
+}
+
+.legend span {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+    vertical-align: middle;
+    border-radius: 3px;
+}
+
+/* Toggle Switch Styles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 25px;
+    margin-right: 10px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 25px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 2.5px;
+    bottom: 2.5px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:checked + .slider:before {
+    transform: translateX(25px);
+}
+
+/* Popup Styles */
+.popup {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4);
+    padding-top: 60px;
+}
+
+.popup-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Button Styles */
+.btn {
+    padding: 6px 12px;
+    margin: 4px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+}
+
+.btn-success {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.btn-danger {
+    background-color: #f44336;
+    color: white;
+}
+
+.btn-primary {
+    background-color: #008CBA;
+    color: white;
+}
+
+/* Trend Popup Styles */
+.trend-popup {
+    display: none;
+    position: fixed;
+    top: 10%;
+    right: 10%;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 10px;
+    z-index: 1000;
+    box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+    width: 300px;
+}
+
+.trend-popup .popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 10px;
+}
+
+.trend-popup .close {
+    font-size: 20px;
+    cursor: pointer;
+}
+
+/* Other Styles */
+th:first-child, td:first-child {
+    width: 300px;
+    white-space: nowrap;
+}
+
+.green { background-color: #d4edda; }
+.darkgreen { background-color: #a3c293; }
+.orange { background-color: #ffd6a5; }
+.lightred { background-color: #f8d7da; }
+.red { background-color: #f5b7b1; }
+.today { background-color: #ffff00 !important; color: black; }
+
+.table-responsive {
+    margin-top: 20px;
+}
+
+#statisticsTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#statisticsTable th, #statisticsTable td {
+    padding: 12px;
+    text-align: center;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    margin-left: 0.5em;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    margin-right: 0.5em;
+}
+
+.vhealth-table {
+    font-size: 11px;
+    width: 100%;
+    table-layout: fixed; /* Ensures the table fits within the container */
+    word-wrap: break-word; /* Prevents content overflow */
+}
+
+.vhealth-table th {
+    padding: 8px;
+    text-align: center;
+}
+
+.vhealth-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vhealth-table th {
+    background-color: #007bff;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.vhealth-table-container {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.firmware-table {
+    font-size: 11px;
+    width: 100%;
+    table-layout: fixed; /* Ensures the table fits within the container */
+    word-wrap: break-word; /* Prevents content overflow */
+}
+
+.firmware-table th {
+    padding: 8px;
+    text-align: center;
+}
+
+.firmware-table td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.firmware-table th {
+    background-color: #007bff;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.firmware-table-container {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+
+/* Ensure the container also takes up full width */
+.container {
+    width: 100%;
+    max-width: 100%; /* Ensure it doesn't exceed the screen width */
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.filter-container .form-select, .filter-container .form-control {
+    flex: 1 1 200px;
+    margin-right: 10px;
+}
+
+#reportTable {
+    width: 100%;
+    table-layout: fixed; /* Force columns to distribute evenly */
+}
+
+#reportTable th, #reportTable td {
+    padding: 8px; /* Adjust padding for better fit */
+    vertical-align: middle;
+    text-align: center;
+    font-size: 0.875rem; /* Smaller font size, 0.875rem is equivalent to 14px */
+    word-wrap: break-word; /* Ensure long words wrap within the cell */
+    white-space: nowrap; /* Prevent text from wrapping */
+    overflow: hidden; /* Hide any overflow */
+    text-overflow: ellipsis; /* Show ellipsis (...) for overflowed text */
+}
+
+#reportTable2 {
+    width: 100%;
+    table-layout: auto; /* Force columns to distribute evenly */
+}
+
+#reportTable2 th, #reportTable2 td {
+    padding: 8px; /* Adjust padding for better fit */
+    vertical-align: middle;
+    text-align: center;
+    font-size: 0.875rem; /* Smaller font size, 0.875rem is equivalent to 14px */
+    word-wrap: break-word; /* Ensure long words wrap within the cell */
+    white-space: nowrap; /* Prevent text from wrapping */
+    overflow: hidden; /* Hide any overflow */
+    text-overflow: ellipsis; /* Show ellipsis (...) for overflowed text */
+}
+
+/* Toggle Switch Style */
+.toggle-switch {
+    position: relative;
+    width: 50px;
+    height: 25px;
+    -webkit-appearance: none;
+    background: #ddd;
+    outline: none;
+    cursor: pointer;
+    border-radius: 25px;
+    transition: background 0.3s;
+}
+
+.toggle-switch:checked {
+    background: #007bff;
+}
+
+.toggle-switch:before {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    top: 2.5px;
+    left: 2.5px;
+    background: #fff;
+    transition: transform 0.3s;
+}
+
+.toggle-switch:checked:before {
+    transform: translateX(25px);
+}
+
+/* Sidebar Styles */
+#sidebarMenu {
+    width: 250px;
+    background-color: #007bff;
+    padding: 15px;
+    transition: all 0.3s;
+}
+
+#sidebarMenu h3 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1.5rem;
+}
+
+#sidebarMenu .nav-link {
+    padding: 10px;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    border-radius: 5px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+#sidebarMenu .nav-link:hover, #sidebarMenu .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+#sidebarMenu .nav-link i {
+    font-size: 1.2rem;
+    margin-right: 10px;
+}
+
+@media (max-width: 768px) {
+    #sidebarMenu {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+
+    .content {
+        margin-left: 0;
+    }
+}
+
+.sidebar {
+    width: 300px;
+    height: 100vh;
+    position: fixed;
+    background-color: #fff;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    overflow-y: auto; /* Allow scrolling if content overflows */
+}
+
+.sidebar .nav-link {
+    color: #333;
+    font-weight: 500;
+    padding: 10px 20px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar .nav-link.active {
+    background-color: #e0e0e0;
+}
+
+.sidebar .nav-link:hover {
+    background-color: #f0f0f0;
+}
+
+.sidebar .nav-link i {
+    margin-right: 10px;
+}
+.refresh-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    cursor: pointer;
+}
+.load-btn {
+    cursor: pointer;
+    margin-left: 10px;  /* Add more space if needed */
+}
+
+/* Additional Styles for Better Layout */
+
+/* Improve spacing and alignment */
+.row.mb-4 {
+    margin-bottom: 30px;
+}
+
+.col-md-3, .col-md-6 {
+    padding: 0 15px;
+}
+
+/* Enhance button styles */
+.btn {
+    padding: 10px 20px;
+    font-size: 16px;
+    border-radius: 5px;
+    transition: background-color 0.3s, transform 0.3s;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border: none;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+}
+
+/* Improve table header styles */
+.table th {
+    background-color: #343a40;
+    color: #ffffff;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+/* Responsive design adjustments */
+@media (max-width: 768px) {
+    .col-md-3, .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+        margin-bottom: 15px;
+    }
+
+    .text-end {
+        text-align: center !important;
+    }
+}
+
+/* Tooltip styling */
+.table td:hover::after, .table th:hover::after {
+    content: attr(data-fulltext); /* Use the data attribute for full text */
+    position: absolute;
+    left: 0;
+    top: 100%;
+    background-color: #333;
+    color: #fff;
+    padding: 5px;
+    border-radius: 3px;
+    white-space: normal; /* Allow text to wrap in tooltip */
+    z-index: 10;
+    width: max-content;
+    max-width: 300px; /* Adjust as needed */
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+    display: none; /* Hide by default */
+}
+
+/* Show tooltip on hover */
+.table td:hover::after, .table th:hover::after {
+    display: block;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+/* Color Legend */
+.color-legend {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 0.9em;
+}
+
+.expanded-content {
+    padding: 10px;
+    border-top: 1px solid #ddd;
+    font-size: 0.9em;
+    background-color: #f9f9f9;
+}
+#logContainer {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background-color: #f1f1f1;
+}
+
+button {
+    padding: 0.5rem 1rem; /* Set reasonable padding */
+    font-size: 1rem; /* Set a standard font size */
+ }
+
+ #toggleReportsButton, #toggleLocationsButton {
+    width: auto; /* Ensure width is not set to a large value */
+    height: auto; /* Ensure height is not set to a large value */
+ }
+
+ .table-scroll {
+    max-height: fit-content; /* Set a fixed height for the table container */
+    overflow-y: auto;  /* Enable vertical scrolling */
+    overflow-x: auto;  /* Enable horizontal scrolling if needed */
+}
+
+.frequency-table-container {
+    max-height: 600px; /* Set a maximum height */
+    overflow-y: auto;  /* Enable vertical scrolling */
+    overflow-x: hidden; /* Hide horizontal overflow */
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 600px;
+}
+
+#calendarContainer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+#calendarContainer div {
+    width: 40px;
+    height: 40px;
+    margin: 5px;
+    text-align: center;
+    line-height: 40px;
+    border: 1px solid #ddd;
+    cursor: pointer;
+}
+
+#calendarContainer div.selected {
+    background-color: #007bff;
+    color: white;
+}
+
+/* Add this to your CSS file */
+.table-header-yellow {
+    background-color: #ffc107 !important; /* Yellow background */
+    color: black; /* Black text */
+}

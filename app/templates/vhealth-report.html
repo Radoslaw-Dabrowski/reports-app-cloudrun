@@ -1,0 +1,70 @@
+{% extends "base-template.html" %}
+
+{% block title %}vHealth Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">vHealth Reports</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="filterZombie" checked>
+                <label for="filterZombie">Zombie files</label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <div class="vhealth-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        console.log("Script loaded and ready");
+
+        // Load table data from Flask backend as JSON
+        var tableData = {{ table_data|safe }};  // JSON data passed safely
+
+        // Initialize Tabulator with dynamic data
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Customer", field: "Customer", headerFilter: "input"},
+                {title: "Location", field: "Location", headerFilter: "input"},
+                {title: "Date", field: "Date", headerFilter: "input"},
+                {title: "Type", field: "Type", headerFilter: "input"},
+                {title: "Name", field: "Name", headerFilter: "input"},
+                {title: "Message", field: "Message", headerFilter: "input"}
+            ],
+            pagination: "local",
+            paginationSize: 100
+        });
+
+        // CSV export functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "vHealth Report.csv");
+        });
+
+        // Checkbox filter functionality for messages containing "zombie"
+        $('#filterZombie').change(function() {
+            var isChecked = $(this).is(':checked');
+            console.log("Checkbox checked:", isChecked);
+            if (isChecked) {
+                table.setFilter("Message", "like", "zombie");
+            } else {
+                table.clearFilter();
+            }
+        });
+
+        // Apply filters on page load
+        $('#filterZombie').trigger('change');
+    });
+</script>
+{% endblock %}

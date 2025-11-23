@@ -1,0 +1,259 @@
+{% extends "base-template.html" %}
+
+{% block title %}RVTools vHosts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">RVTools vHosts</h1>
+
+    <div class="form-container mb-4">
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+            <button id="toggleColumnsButton" class="btn btn-outline-secondary">Toggle Columns</button>
+        </div>
+    </div>
+
+    <!-- Modern checkbox list for column visibility -->
+    <div id="columnCheckboxList" class="floating-checkbox-list">
+        <div class="check-group">
+            <label for="customerCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="customerCheckbox" data-column="customer" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Customer</span>
+            </label>
+            <label for="locationCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="locationCheckbox" data-column="location" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Location</span>
+            </label>
+
+            <label for="reportDateCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="reportDateCheckbox" data-column="reportDate" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Report Date</span>
+            </label>
+            <label for="rvtoolsTypeCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="rvtoolsTypeCheckbox" data-column="rvtoolsType" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">RVTools Type</span>
+            </label>
+            <label for="hostCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="hostCheckbox" data-column="host" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Host</span>
+            </label>
+            <label for="clusterCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="clusterCheckbox" data-column="cluster" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Cluster</span>
+            </label>
+            <label for="inMaintenanceModeCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="inMaintenanceModeCheckbox" data-column="inMaintenanceMode" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">in Maintenance Mode</span>
+            </label>
+            <label for="cpuModelCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="cpuModelCheckbox" data-column="cpuModel" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">CPU Model</span>
+            </label>
+            <label for="noCPUCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="noCPUCheckbox" data-column="noCPU">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label"># CPU</span>
+            </label>
+            <label for="coresPerCPUCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="coresPerCPUCheckbox" data-column="coresPerCPU">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Cores per CPU</span>
+            </label>
+            <label for="noCoresCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="noCoresCheckbox" data-column="noCores">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label"># Cores</span>
+            </label>
+            <label for="noMemoryCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="noMemoryCheckbox" data-column="noMemory">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label"># Memory</span>
+            </label>
+            <label for="noNICsCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="noNICsCheckbox" data-column="noNICs">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label"># NICs</span>
+            </label>
+            <label for="noHBAsCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="noHBAsCheckbox" data-column="noHBAs">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label"># HBAs</span>
+            </label>
+            <label for="currentEVCCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="currentEVCCheckbox" data-column="currentEVC">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Current EVC</span>
+            </label>
+            <label for="esxVersionCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="esxVersionCheckbox" data-column="esxVersion" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">ESX Version</span>
+            </label>
+            <label for="domainCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="domainCheckbox" data-column="domain" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Domain</span>
+            </label>
+            <label for="vendorCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="vendorCheckbox" data-column="vendor" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Vendor</span>
+            </label>
+            <label for="modelCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="modelCheckbox" data-column="model" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Model</span>
+            </label>
+            <label for="serialNumberCheckbox" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="serialNumberCheckbox" data-column="serialNumber">
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">Serial number</span>
+            </label>
+        </div>
+    </div>
+
+    <div class="vhealth-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                reportDate: "{{ row['Report Date'] }}",
+                rvtoolsType: "{{ row['RVTools Type'] }}",
+                host: "{{ row.Host }}",
+                cluster: "{{ row.Cluster }}",
+                inMaintenanceMode: "{{ row['in Maintenance Mode'] }}",
+                cpuModel: "{{ row['CPU Model'] }}",
+                noCPU: "{{ row['# CPU'] }}",
+                coresPerCPU: "{{ row['Cores per CPU'] }}",
+                noCores: "{{ row['# Cores'] }}",
+                noMemory: Math.ceil({{ row['# Memory'] }} / 1024),
+                noNICs: "{{ row['# NICs'] }}",
+                noHBAs: "{{ row['# HBAs'] }}",
+                currentEVC: "{{ row['Current EVC'] }}",
+                esxVersion: "{{ row['ESX Version'] }}",
+                domain: "{{ row['Domain'] }}",
+                vendor: "{{ row['Vendor'] }}",
+                model: "{{ row['Model'] }}",
+                serialNumber: "{{ row['Serial number'] }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitData",
+            resizableColumns: true,
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input", tooltip: true},
+                {title: "Location", field: "location", headerFilter: "input", tooltip: true},
+                {title: "Report Date", field: "reportDate", headerFilter: "input", tooltip: true},
+                {title: "RVTools Type", field: "rvtoolsType", headerFilter: "input", tooltip: true},
+                {title: "Host", field: "host", headerFilter: "input", tooltip: true},
+                {title: "# CPU", field: "noCPU", headerFilter: "input", tooltip: true, visible: false},
+                {title: "Cores per CPU", field: "coresPerCPU", headerFilter: "input", tooltip: true, visible: false},
+                {title: "# Cores", field: "noCores", headerFilter: "input", tooltip: true, visible: false},
+                {title: "# Memory", field: "noMemory", headerFilter: "input", tooltip: true, visible: false},
+                {title: "# NICs", field: "noNICs", headerFilter: "input", tooltip: true, visible: false},
+                {title: "# HBAs", field: "noHBAs", headerFilter: "input", tooltip: true, visible: false},
+                {title: "Current EVC", field: "currentEVC", headerFilter: "input", tooltip: true, visible: false},
+                {title: "Serial number", field: "serialNumber", headerFilter: "input", tooltip: true, visible: false},
+                {title: "CPU Model", field: "cpuModel", headerFilter: "input", tooltip: true},
+                {title: "ESX Version", field: "esxVersion", headerFilter: "input", tooltip: true},
+                {title: "Domain", field: "domain", headerFilter: "input", tooltip: true},
+                {title: "Vendor", field: "vendor", headerFilter: "input", tooltip: true},
+                {title: "Model", field: "model", headerFilter: "input", tooltip: true}
+            ],
+            pagination: "local",
+            paginationSize: 100,
+            movableColumns: true,
+        });
+
+        $('#exportButton').click(function() {
+            table.download("csv", "RVTools vHosts Report.csv");
+        });
+
+        $('#toggleColumnsButton').click(function() {
+            $('#columnCheckboxList').toggle();
+        });
+
+        $('.checkbox__input').change(function() {
+            var columnField = $(this).data('column');
+            table.toggleColumn(columnField);
+        });
+    });
+</script>
+{% endblock %}

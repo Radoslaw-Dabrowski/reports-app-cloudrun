@@ -1,0 +1,124 @@
+{% extends "base-template.html" %}
+
+{% block title %}Network Utilization{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Network Utilization</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="filterHighUtilized" checked>
+                <label for="filterHighUtilized">Show only entries with Used % bigger than 90</label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="exportCsvButton" class="btn btn-primary">Export to CSV</button>
+            <button id="manageExclusionsButton" class="btn btn-secondary" data-toggle="modal" data-target="#manageExclusionsModal">Manage Exclusions</button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <div id="networkTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<!-- Modal for Managing Exclusions -->
+<div class="modal fade" id="manageExclusionsModal" tabindex="-1" role="dialog" aria-labelledby="manageExclusionsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manageExclusionsLabel">Manage Exclusions</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modalExclusionsContent">
+                <!-- Content will be loaded dynamically here -->
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row['Customer'] }}",
+                location: "{{ row['Location'] }}",
+                reportDate: "{{ row['Report Date'] }}",
+                network: "{{ row['Network'] }}",
+                networkView: "{{ row['Network view'] }}",
+                totalRange: "{{ row['Total range'] }}",
+                totalUsed: "{{ row['Total used'] }}",
+                availableIps: "{{ row['Available IP addresses'] }}",
+                usedPercent: parseFloat("{{ row['Used %'] }}".replace('%', ''))
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        var table = new Tabulator("#networkTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Report Date", field: "reportDate", headerFilter: "input"},
+                {title: "Network", field: "network", headerFilter: "input"},
+                {title: "Network View", field: "networkView", headerFilter: "input"},
+                {title: "Total Range", field: "totalRange", headerFilter: "input"},
+                {title: "Total Used", field: "totalUsed", headerFilter: "input"},
+                {title: "Available IPs", field: "availableIps", headerFilter: "input"},
+                {title: "Used %", field: "usedPercent", headerFilter: "input"}
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        $('#exportCsvButton').click(function() {
+            table.download("csv", "Network Utilization Report.csv");
+        });
+
+        // Checkbox filter functionality    
+        $('#filterHighUtilized').change(function() {
+            var isChecked = $(this).is(':checked');
+            if(isChecked){
+                table.setFilter("usedPercent", ">=", 90);
+            } else {
+                // Remove the filter when unchecked
+                table.clearFilter();
+            }
+        });
+
+        $('#manageExclusionsModal').modal({
+            show: false
+        });
+
+        // Load exclusions dynamically when modal is opened
+        $('button[data-target="#manageExclusionsModal"]').click(function(){
+            $('#modalExclusionsContent').html('<div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div>'); // Show a spinner while loading
+            $.ajax({
+                url: '/manage_exclusions',
+                method: 'GET',
+                success: function(data) {
+                    // Replace the modal content with the received HTML
+                    $('#modalExclusionsContent').html(data);
+                },
+                error: function() {
+                    $('#modalExclusionsContent').html('<p class="text-danger">Error loading exclusions. Please try again later.</p>');
+                }
+            });
+        });
+
+        // Apply filters on page load
+        $('#filterHighUtilized').trigger('change');
+    });
+</script>
+{% endblock %}
+
+

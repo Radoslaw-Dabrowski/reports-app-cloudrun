@@ -1,0 +1,50 @@
+<!-- templates/loading.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
+        .loader {
+            font-size: 24px;
+        }
+    </style>
+    <script>
+        // Automatically call the load_s3_to_db endpoint when the page loads
+        window.onload = function() {
+            fetch("{{ url_for('load_s3_to_db') }}")
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('Network response was not ok.');
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Redirect to all reports page after successful refresh
+                        window.location.href = "{{ url_for('main.all_reports') }}";
+                    } else {
+                        alert('Failed to refresh data.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error refreshing data. Please try again.');
+                });
+        };
+    </script>
+</head>
+<body>
+    <div class="loader">Loading, please wait...</div>
+</body>
+</html>

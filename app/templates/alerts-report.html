@@ -1,0 +1,133 @@
+<!-- alerts.html -->
+{% extends "base-template.html" %}
+
+{% block title %}Alerts{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">
+        Alerts for {{ request.args.get('location') if request.args.get('location') else 'All locations' }}
+    </h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="showCritical" checked>
+                <label for="showCritical">Show only critical alerts</label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="download-csv" class="btn btn-primary">Download CSV</button>
+        </div>
+    </div>
+
+    <!-- Summary Table -->
+    <div class="summary-table-container mb-4" style="width: auto; display: inline-block;">
+        <div id="summaryTable"></div> <!-- Tabulator will render here -->
+    </div>
+
+    <!-- Table for Tabulator to render -->
+    <div class="alerts-table-container table-container">
+        <div id="alertsTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Data to be rendered by Tabulator
+        var tableData = [
+            {% for alert in alerts_data %}
+            {
+                customer: "{{ alert['Customer'] }}",
+                location: "{{ alert['Location'] }}",
+                reportDate: "{{ alert['Report Date'] }}",
+                name: "{{ alert['Name'] }}",
+                objectName: "{{ alert['Object Name'] }}",
+                status: "{{ alert['Status'] }}",
+                startTime: "{{ alert['Start Time'] }}",
+                criticalityLevel: "{{ alert['Criticality Level'] }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        // Initialize Tabulator for alerts table
+        var table = new Tabulator("#alertsTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input", tooltip: true},
+                {title: "Location", field: "location", headerFilter: "input", tooltip: true},
+                {title: "Report Date", field: "reportDate", headerFilter: "input", sorter: "date", tooltip: true},
+                {title: "Name", field: "name", headerFilter: "input", tooltip: true, minWidth: 900},
+                {title: "Object Name", field: "objectName", headerFilter: "input", tooltip: true},
+                {title: "Status", field: "status", headerFilter: "input", tooltip: true},
+                {title: "Start Time", field: "startTime", headerFilter: "input", tooltip: true, minWidth: 200},
+                {title: "Criticality Level", field: "criticalityLevel", headerFilter: "input", tooltip: true}
+            ],
+            pagination: "local",
+            paginationSize: 100
+        });
+
+        // Initialize Tabulator for summary table
+        var summaryTable = new Tabulator("#summaryTable", {
+            layout: "fitData", // Adjust layout to fit data
+            columns: [
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Critical Alerts", field: "criticalAlerts", headerFilter: "input"},
+                {title: "Non-Critical Alerts", field: "nonCriticalAlerts", headerFilter: "input"},
+                {title: "Total Alerts", field: "totalAlerts", headerFilter: "input"}
+            ],
+            data: calculateSummaryData(tableData),
+            pagination: "local",
+            paginationSize: 100,
+            rowClick: function(e, row) {
+                // Redirect to a URL specific to the location
+                var location = row.getData().location;
+                var url = `/alerts?location=${encodeURIComponent(location)}`;
+                window.location.href = url;
+            }
+        });
+
+        // Function to calculate summary data
+        function calculateSummaryData(data) {
+            var summary = {};
+            data.forEach(function(alert) {
+                var location = alert.location;
+                if (!summary[location]) {
+                    summary[location] = {location: location, totalAlerts: 0, criticalAlerts: 0, nonCriticalAlerts: 0};
+                }
+                summary[location].totalAlerts++;
+                if (alert.criticalityLevel === "Critical") {
+                    summary[location].criticalAlerts++;
+                } else {
+                    summary[location].nonCriticalAlerts++;
+                }
+            });
+            return Object.values(summary);
+        }
+
+        // Function to filter table based on criticality
+        function filterCriticalAlerts() {
+            if ($("#showCritical").is(":checked")) {
+                table.setFilter("criticalityLevel", "=", "Critical");
+            } else {
+                table.clearFilter();
+            }
+        }
+
+        // Initial filter application
+        filterCriticalAlerts();
+
+        // Add event listener for the checkbox
+        $("#showCritical").change(function() {
+            filterCriticalAlerts();
+        });
+
+        // Add event listener for the download button
+        document.getElementById("download-csv").addEventListener("click", function() {
+            table.download("csv", "alerts.csv");
+        });
+    });
+</script>
+{% endblock %}

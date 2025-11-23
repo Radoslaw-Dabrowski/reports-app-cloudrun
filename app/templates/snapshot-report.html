@@ -1,0 +1,179 @@
+{% extends "base-template.html" %}
+
+{% block title %}Snapshot Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Snapshot Reports</h1>
+
+
+
+    <!-- Form for Filters and Actions -->
+    <div class="form-container mb-4">
+        <!-- Filter Options -->
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="olderThan7" checked>
+                <label for="olderThan7">Show only older than 7 days</label>
+            </li>
+        </ul>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+            <button id="emailButton" class="btn btn-secondary">Prepare Emails</button>
+        </div>
+    </div>
+
+    <!-- Table for Tabulator to render -->
+    <div class="snapshot-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+
+    <!-- Log messages will appear here -->
+    <div id="logMessages" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: auto;">
+        <h4>Log Messages</h4>
+    </div>
+</div>
+
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+    $(document).ready(function() {
+        // Function to log messages to the page
+        function logMessage(message) {
+            $('#logMessages').append('<p>' + message + '</p>');
+        }
+
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                reportDate: "{{ row.Date }}",
+                name: "{{ row.Name }}",
+                snapshotSpaceGb: "{{ row['Snapshot Space (GB)'] }}",
+                snapshotAgeDays: "{{ row['Snapshot Age (Days)'] }}",
+                parentCluster: "{{ row['Parent Cluster'] }}",
+                parentVcenter: "{{ row['Parent vCenter'] }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Log the initial table data
+        logMessage("Initial table data: " + JSON.stringify(tableData));
+
+        // Initialize Tabulator
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Report Date", field: "reportDate", headerFilter: "input", sorter: "date"},
+                {title: "Name", field: "name", headerFilter: "input"},
+                {title: "Snapshot Space (GB)", field: "snapshotSpaceGb", headerFilter: "input"},
+                {title: "Snapshot Age (Days)", field: "snapshotAgeDays", headerFilter: "input"},
+                {title: "Parent Cluster", field: "parentCluster", headerFilter: "input"},
+                {title: "Parent vCenter", field: "parentVcenter", headerFilter: "input"},
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "Snapshot_Report.csv");
+        });
+
+        // Checkbox filter functionality
+        $('#olderThan7').change(function() {
+            var olderThan7 = $('#olderThan7').is(':checked');
+
+            table.setFilter(function(data) {
+                var matchesAgeCriteria = true;
+                if (olderThan7) {
+                    matchesAgeCriteria = data.snapshotAgeDays !== '-' && parseInt(data.snapshotAgeDays) > 7;
+                }
+
+                return matchesAgeCriteria;
+            });
+        });
+
+        // Mapping of customers to email addresses and names
+        var customerEmailMap = {
+            "SIE": {email: "daniel.plesa@atos.net", name: "Daniel"},
+            "BTN": {email: "daniel.plesa@atos.net", name: "Daniel"},
+            "ANA": {email: "sylwester.kurowski@atos.net", name: "Sylwester"},
+            "AGF": {email: "sylwester.kurowski@atos.net", name: "Sylwester"},
+            "HLI": {email: "sylwester.kurowski@atos.net", name: "Sylwester"},
+            "AVI": {email: "shankar.somoshi@atos.net", name: "Shankar"}
+        };
+
+        // Function to divide data by customer, sort by snapshot age, and prepare emails
+        function prepareEmails() {
+            logMessage("Prepare Emails button clicked."); // Log message
+
+            // Get filtered data from the table
+            var filteredData = table.getData().filter(function(row) {
+                return parseInt(row.snapshotAgeDays) > 7;
+            });
+
+            var customerData = {};
+
+            // Group filtered data by customer
+            filteredData.forEach(function(row) {
+                if (!customerData[row.customer]) {
+                    customerData[row.customer] = [];
+                }
+                customerData[row.customer].push(row);
+            });
+
+            // Log the grouped customer data
+            logMessage("Grouped customer data: " + JSON.stringify(customerData));
+
+            // Prepare email for each customer
+            var customerKeys = Object.keys(customerData);
+
+            customerKeys.forEach(function(customer) {
+                logMessage("Processing customer: " + customer); // Log each customer being processed
+
+                // Sort data by snapshot age
+                customerData[customer].sort(function(a, b) {
+                    return parseInt(b.snapshotAgeDays) - parseInt(a.snapshotAgeDays);
+                });
+
+                // Prepare email content
+                var recipientInfo = customerEmailMap[customer] || {email: "default@example.com", name: "Customer"};
+                var emailSubject = `Snapshot Report for ${customer}`;
+                var emailBody = `Dear ${recipientInfo.name},\n\nPlease coordinate with the relevant teams to address the following snapshots:\n\n`;
+
+                // Add list of snapshots with limited details
+                customerData[customer].forEach(function(row) {
+                    emailBody += `- ${row.name}, ${row.location}, ${row.snapshotAgeDays} days\n`;
+                });
+
+                // Create mailto link with body and CC
+                var mailtoLink = `mailto:${recipientInfo.email}?cc=DHC-DevSecOps@atos.net&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+
+                // Open email client
+                var newWindow = window.open(mailtoLink, '_blank');
+
+                if (newWindow) {
+                    logMessage(`Email prepared for ${customer}: ${mailtoLink}`);
+                    newWindow.focus();
+                } else {
+                    logMessage(`Failed to open email for ${customer}.`);
+                }
+            });
+        }
+
+        // Button click event to prepare emails
+        $('#emailButton').click(function() {
+            prepareEmails();
+        });
+    });
+</script>
+{% endblock %}
+

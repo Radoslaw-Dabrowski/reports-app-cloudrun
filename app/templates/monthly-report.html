@@ -1,0 +1,538 @@
+{% extends "base-template.html" %}
+
+{% block title %}DHC Reports for {{ selected_month_name }} {{ selected_year }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">DHC Reports for {{ selected_month_name }} {{ selected_year }}</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="excludeMissing">
+                <label for="excludeMissing">Exclude Missing</label>
+            </li>
+            <li>
+                <input type="checkbox" id="notDeliveredToday">
+                <label for="notDeliveredToday">Not Delivered Today</label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="toggleReportsButton" class="btn btn-outline-secondary">Toggle Reports</button>
+            <button id="toggleLocationsButton" class="btn btn-outline-secondary">Toggle Locations</button>
+            <button id="exportCsvButton" class="btn btn-primary">Export to CSV</button>
+            <button class="btn btn-primary" onclick="togglePopup()">Set Frequencies</button>
+        </div>
+    </div>
+
+    <!-- Floating checkbox list for reports -->
+    <div id="reportCheckboxList" class="floating-checkbox-list" style="display: none;">
+        <div class="check-group">
+            {% for report in reports | sort %}
+            <label for="reportCheckbox{{ loop.index }}" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="reportCheckbox{{ loop.index }}" data-report="{{ report }}" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">{{ report }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Floating checkbox list for locations -->
+    <div id="locationCheckboxList" class="floating-checkbox-list" style="display: none;">
+        <div class="check-group">
+            {% for location in locations | sort %}
+            <label for="locationCheckbox{{ loop.index }}" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="locationCheckbox{{ loop.index }}" data-location="{{ location }}" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">{{ location }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Navigation for Previous and Next Month -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <button class="btn btn-secondary" onclick="navigateMonth(-1)">Previous Month</button>
+        </div>
+        <div class="col-md-6 text-end">
+            <button class="btn btn-secondary" onclick="navigateMonth(1)">Next Month</button>
+            <button class="btn btn-secondary" onclick="setToday()">Today</button>
+        </div>
+    </div>
+
+    <!-- Table Container for Tabulator -->
+    <div class="vhealth-table-container table-container">
+        <div id="reportTableContainer" class="table-scroll">
+            <div id="reportTable"></div>
+        </div>
+    </div>
+
+    <!-- Floating Popup for Frequency Table -->
+    <div id="setFrequenciesPopup" class="popup">
+        <div class="popup-content">
+            <span class="close" onclick="togglePopup()">&times;</span>
+            <h2 class="text-center">Set Frequencies</h2>
+            <div id="frequencyTable" class="frequency-table-container"></div> <!-- Add a specific class here -->
+            <div class="text-center mt-2">
+                <button id="addFrequencyBtn" class="btn btn-secondary btn-sm">Add Frequency</button>
+                <form id="frequencyForm" method="POST" action="{{ url_for('main.set_frequencies') }}">
+                    <input type="hidden" name="frequencyData" id="frequencyData">
+                    <button id="updateFrequenciesBtn" class="btn btn-primary btn-sm" type="submit">Update Frequencies</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for selecting specific days -->
+    <div id="daySelectionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDaySelectionModal()">&times;</span>
+            <h2>Select Specific Days</h2>
+            <div id="calendarContainer"></div>
+            <h3>Select Days of the Week</h3>
+            <div id="weekDaysContainer">
+                <label><input type="checkbox" value="Monday"> Monday</label>
+                <label><input type="checkbox" value="Tuesday"> Tuesday</label>
+                <label><input type="checkbox" value="Wednesday"> Wednesday</label>
+                <label><input type="checkbox" value="Thursday"> Thursday</label>
+                <label><input type="checkbox" value="Friday"> Friday</label>
+                <label><input type="checkbox" value="Saturday"> Saturday</label>
+                <label><input type="checkbox" value="Sunday"> Sunday</label>
+            </div>
+            <button onclick="saveDaySelections()">Save</button>
+        </div>
+    </div>
+
+    <!-- Add a modal for frequency selection -->
+    <div id="frequencySelectionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeFrequencySelectionModal()">&times;</span>
+            <h2>Select Frequency</h2>
+            <div id="frequencyOptionsContainer">
+                <label><input type="radio" name="frequencyOption" value="none"> None</label><br>
+                <label><input type="radio" name="frequencyOption" value="daily"> Daily</label><br>
+                <label><input type="radio" name="frequencyOption" value="weekly"> Weekly</label><br>
+                <label><input type="radio" name="frequencyOption" value="monthly"> Monthly</label><br>
+                <label><input type="radio" name="frequencyOption" value="custom"> Custom</label>
+            </div>
+            <button onclick="saveFrequencySelection()">Save</button>
+        </div>
+    </div>
+
+    <!-- Add a modal for location selection -->
+    <div id="locationSelectionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeLocationSelectionModal()">&times;</span>
+            <h2>Select Location</h2>
+            <div id="locationOptionsContainer">
+                <label><input type="radio" name="locationOption" value="All Locations"> All Locations</label><br>
+                {% for location in locations %}
+                <label><input type="radio" name="locationOption" value="{{ location }}"> {{ location }}</label><br>
+                {% endfor %}
+            </div>
+            <button onclick="saveLocationSelection()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Sort reports and locations by name
+        var sortedReports = {{ reports|sort|tojson }};
+        var sortedLocations = {{ locations|sort|tojson }};
+
+        // Restore selections from cookies and apply filter
+        restoreSelections();
+ 
+        // Toggle Reports and Locations
+        $('#toggleReportsButton').click(function() {
+            $('#reportCheckboxList').toggle();
+        });
+
+        $('#toggleLocationsButton').click(function() {
+            $('#locationCheckboxList').toggle();
+        });
+
+        $('.checkbox__input').change(function() {
+            filterTableData();
+            saveSelections();
+        });
+
+        function filterTableData() {
+            var selectedReports = [];
+            var selectedLocations = [];
+            var excludeMissing = $('#excludeMissing').is(':checked');
+            var notDeliveredToday = $('#notDeliveredToday').is(':checked');
+            var today = new Date().getDate();
+
+            // Get selected reports
+            $('#reportCheckboxList .checkbox__input:checked').each(function() {
+                selectedReports.push($(this).data('report'));
+            });
+
+            // Get selected locations
+            $('#locationCheckboxList .checkbox__input:checked').each(function() {
+                selectedLocations.push($(this).data('location'));
+            });
+
+            // Filter the table data
+            reportTable.setFilter(function(data) {
+                var reportMatch = selectedReports.includes(data.reportName);
+                var locationMatch = selectedLocations.includes(data.location);
+                var missingMatch = !excludeMissing || !Object.values(data).includes("Miss");
+                var notDeliveredMatch = !notDeliveredToday || data[`day${today}`] === "No";
+
+                return reportMatch && locationMatch && missingMatch && notDeliveredMatch;
+            });
+        }
+
+        function saveSelections() {
+            var selectedReports = [];
+            var selectedLocations = [];
+
+            $('#reportCheckboxList .checkbox__input:checked').each(function() {
+                selectedReports.push($(this).data('report'));
+            });
+
+            $('#locationCheckboxList .checkbox__input:checked').each(function() {
+                selectedLocations.push($(this).data('location'));
+            });
+
+            document.cookie = "selectedReports=" + JSON.stringify(selectedReports) + "; path=/";
+            document.cookie = "selectedLocations=" + JSON.stringify(selectedLocations) + "; path=/";
+        }
+
+        function restoreSelections() {
+            var selectedReports = getCookie("selectedReports");
+            var selectedLocations = getCookie("selectedLocations");
+
+            if (selectedReports) {
+                selectedReports = JSON.parse(selectedReports);
+                $('#reportCheckboxList .checkbox__input').each(function() {
+                    if (selectedReports.includes($(this).data('report'))) {
+                        $(this).prop('checked', true);
+                    } else {
+                        $(this).prop('checked', false);
+                    }
+                });
+            }
+
+            if (selectedLocations) {
+                selectedLocations = JSON.parse(selectedLocations);
+                $('#locationCheckboxList .checkbox__input').each(function() {
+                    if (selectedLocations.includes($(this).data('location'))) {
+                        $(this).prop('checked', true);
+                    } else {
+                        $(this).prop('checked', false);
+                    }
+                });
+            }
+        }
+
+        function getCookie(name) {
+            var value = "; " + document.cookie;
+            var parts = value.split("; " + name + "=");
+            if (parts.length == 2) return parts.pop().split(";").shift();
+        }
+
+        // Table Data for DHC Reports
+        var tableData = [
+            {% for index, row in table_data.iterrows() %}
+            {
+                customer: "{{ row['customer'] }}",
+                location: "{{ row['location'] }}",
+                reportName: "{{ row['report name'] }}",
+                {% for day in days_columns %}
+                day{{ loop.index }}: "{{ row[day] }}",
+                {% endfor %}
+                color: "{{ row['color'] if 'color' in row else '' }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        // Store the initial table data
+        var initialTableData = tableData.slice();
+
+        // Initialize Tabulator for main DHC Reports Table
+        var reportTable = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input", widthGrow: 2, tooltip: true},
+                {title: "Location", field: "location", headerFilter: "input", widthGrow: 2, tooltip: true},
+                {title: "Report Name", field: "reportName", headerFilter: "input", widthGrow: 3, tooltip: true},
+                {% for day in days_columns %}
+                {title: "{{ day }}", field: "day{{ loop.index }}", headerSort: false, formatter: cellFormatter,
+                 cssClass: "{{ 'table-today' if day == today_day else '' }}", headerClass: "table-header-yellow"},
+                {% endfor %}
+            ],
+            pagination: "local",
+            paginationSize: 100,
+            rowFormatter: function(row) {
+                var data = row.getData();
+                if (data.color) {
+                    row.getElement().style.backgroundColor = data.color;
+                }
+            }
+        });
+
+        // Apply initial filter after table is initialized
+        filterTableData();
+
+        // Cell Formatter for coloring based on values
+        function cellFormatter(cell) {
+            var value = cell.getValue();
+            var cellElement = cell.getElement();
+            switch (value) {
+                case "Yes":
+                    cellElement.style.backgroundColor = "#d4edda"; // Light green
+                    cellElement.style.color = "#155724"; // Dark green text
+                    break;
+                case "No":
+                    cellElement.style.backgroundColor = "#f8d7da"; // Light red
+                    cellElement.style.color = "#721c24"; // Dark red text
+                    break;
+                case "Miss":
+                    cellElement.style.backgroundColor = "#fff3cd"; // Light yellow
+                    cellElement.style.color = "#856404"; // Dark yellow text
+                    break;
+                case "N/A":
+                    cellElement.style.backgroundColor = "#ffffff"; // White
+                    cellElement.style.color = "#000000"; // Black text
+                    break;
+                default:
+                    break;
+            }
+            return value;
+        }
+
+        // Initialize Tabulator for Frequencies Table inside popup
+        var frequencyData = [
+            {% for row in frequencies_data %}
+            {
+                reportName: "{{ row['reportName'] }}",
+                frequency: "{{ row['frequency'] }}",
+                location: "{{ row['location'] }}",
+                specificDays: "{{ row['specificDays'] }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        var frequencyTable = new Tabulator("#frequencyTable", {
+            data: frequencyData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Report Name", field: "reportName", editor: "input", widthGrow: 3, headerFilter: "input"},
+                {title: "Frequency", field: "frequency", editor: false, cellClick: function(e, cell) {
+                    openFrequencySelectionModal(cell);
+                }},
+                {title: "Location", field: "location", editor: false, cellClick: function(e, cell) {
+                    openLocationSelectionModal(cell);
+                }},
+                {title: "Specific Days", field: "specificDays", editor: "input", widthGrow: 2, headerFilter: "input",
+                 cellClick: function(e, cell) {
+                     var currentDays = cell.getValue();
+                     openDaySelectionModal(currentDays, cell);
+                 }},
+                {formatter: "buttonCross", width: 40, align: "center", cellClick: function(e, cell) {
+                    cell.getRow().delete();
+                }}
+            ]
+        });
+
+        // Add New Row to Frequency Table
+        document.getElementById("addFrequencyBtn").addEventListener("click", function() {
+            frequencyTable.addRow({});
+        });
+
+        // Toggle Popup Display
+        window.togglePopup = function() {
+            $("#setFrequenciesPopup").toggle();
+        }
+
+        // Event listeners for checkboxes
+        $('.checkbox__input').change(function() {
+            filterTableData();
+            saveSelections();
+        });
+
+        $('#excludeMissing').change(function() {
+            filterTableData();
+        });
+
+        $('#notDeliveredToday').change(function() {
+            filterTableData();
+        });
+
+        // Export DHC Report Table to CSV
+        $('#exportCsvButton').click(function() {
+            reportTable.download("csv", "DHC_Reports.csv");
+        });
+
+        // Update Frequencies
+        document.getElementById("updateFrequenciesBtn").addEventListener("click", function() {
+            var updatedData = frequencyTable.getData(); // Get data from Tabulator
+            document.getElementById("frequencyForm").elements["frequencyData"].value = JSON.stringify(updatedData);
+            document.getElementById("frequencyForm").submit();
+        });
+
+        filterTableData();
+
+    });
+
+    // Navigation Functions
+    function navigateMonth(offset) {
+        let month = {{ selected_month }};
+        let year = {{ selected_year }};
+        
+        month += offset;
+        if (month > 12) {
+            month = 1;
+            year++;
+        } else if (month < 1) {
+            month = 12;
+            year--;
+        }
+
+        window.location.href = `/monthly_report?month=${month}&year=${year}`;
+    }
+
+    function setToday() {
+        const today = new Date();
+        const month = today.getMonth() + 1;
+        const year = today.getFullYear();
+
+        window.location.href = `/monthly_report?month=${month}&year=${year}`;
+    }
+
+    // Function to open the day selection modal
+    function openDaySelectionModal(currentDays, cell) {
+        const selectedDays = currentDays.split(',').map(day => parseInt(day.trim()));
+
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = today.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        const calendarContainer = document.getElementById('calendarContainer');
+        calendarContainer.innerHTML = '';
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayDiv = document.createElement('div');
+            dayDiv.textContent = day;
+            if (selectedDays.includes(day)) {
+                dayDiv.classList.add('selected');
+            }
+            dayDiv.onclick = function() {
+                dayDiv.classList.toggle('selected');
+            };
+            calendarContainer.appendChild(dayDiv);
+        }
+
+        // Store the cell in a global variable for later use
+        window.currentCell = cell;
+
+        // Show the modal
+        document.getElementById('daySelectionModal').style.display = 'block';
+    }
+
+    function closeDaySelectionModal() {
+        document.getElementById('daySelectionModal').style.display = 'none';
+    }
+
+    function saveDaySelections() {
+        const selectedDays = Array.from(document.querySelectorAll('#calendarContainer div.selected'))
+            .map(div => div.textContent);
+
+        const selectedWeekDays = Array.from(document.querySelectorAll('#weekDaysContainer input:checked'))
+            .map(input => input.value);
+
+        // Here you can save the selectedDays and selectedWeekDays to your data model
+        if (window.currentCell) {
+            window.currentCell.setValue(selectedDays.join(', ') + ' | ' + selectedWeekDays.join(', '));
+        }
+
+        console.log('Selected Days:', selectedDays);
+        console.log('Selected Week Days:', selectedWeekDays);
+
+        closeDaySelectionModal();
+    }
+
+    // Function to open the frequency selection modal
+    function openFrequencySelectionModal(cell) {
+        // Set the current cell globally to update it later
+        window.currentFrequencyCell = cell;
+
+        // Pre-select the current frequency in the modal
+        var currentFrequency = cell.getValue();
+        document.querySelectorAll('input[name="frequencyOption"]').forEach(function(input) {
+            input.checked = (input.value === currentFrequency);
+        });
+
+        // Show the modal
+        document.getElementById('frequencySelectionModal').style.display = 'block';
+    }
+
+    // Function to close the frequency selection modal
+    function closeFrequencySelectionModal() {
+        document.getElementById('frequencySelectionModal').style.display = 'none';
+    }
+
+    // Function to save the selected frequency
+    function saveFrequencySelection() {
+        var selectedFrequency = document.querySelector('input[name="frequencyOption"]:checked').value;
+
+        // Update the cell with the selected frequency
+        if (window.currentFrequencyCell) {
+            window.currentFrequencyCell.setValue(selectedFrequency);
+        }
+
+        // Close the modal
+        closeFrequencySelectionModal();
+    }
+
+    // Function to open the location selection modal
+    function openLocationSelectionModal(cell) {
+        // Set the current cell globally to update it later
+        window.currentLocationCell = cell;
+
+        // Pre-select the current location in the modal
+        var currentLocation = cell.getValue();
+        document.querySelectorAll('input[name="locationOption"]').forEach(function(input) {
+            input.checked = (input.value === currentLocation);
+        });
+
+        // Show the modal
+        document.getElementById('locationSelectionModal').style.display = 'block';
+    }
+
+    // Function to close the location selection modal
+    function closeLocationSelectionModal() {
+        document.getElementById('locationSelectionModal').style.display = 'none';
+    }
+
+    // Function to save the selected location
+    function saveLocationSelection() {
+        var selectedLocation = document.querySelector('input[name="locationOption"]:checked').value;
+
+        // Update the cell with the selected location
+        if (window.currentLocationCell) {
+            window.currentLocationCell.setValue(selectedLocation);
+        }
+
+        // Close the modal
+        closeLocationSelectionModal();
+    }
+
+</script>
+
+{% endblock %}

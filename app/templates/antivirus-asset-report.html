@@ -1,0 +1,194 @@
+{% extends "base-template.html" %}
+
+{% block title %}Antivirus Asset Report{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Antivirus Asset Report</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="filterNotMatchingPattern">
+                <label for="filterNotMatchingPattern">Show only entries not matching pattern</label>
+            </li>
+            <li>
+                <input type="checkbox" id="filterOlderThan5Days" checked>
+                <label for="filterOlderThan5Days">Show only entries older than 5 days <span id="olderThanDate"></span></label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="toggleLocationsButton" class="btn btn-outline-secondary">Toggle Locations</button>
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <!-- Floating checkbox list for locations -->
+    <div id="locationCheckboxList" class="floating-checkbox-list" style="display: none;">
+        <div class="check-group">
+            {% for location in locations %}
+            <label for="locationCheckbox{{ loop.index }}" class="checkbox">
+                <input class="checkbox__input" type="checkbox" id="locationCheckbox{{ loop.index }}" data-location="{{ location }}" checked>
+                <svg class="checkbox__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 22 22">
+                    <rect width="21" height="21" x=".5" y=".5" fill="#FFF" stroke="#006F94" rx="3" />
+                    <path class="tick" stroke="#6EA340" fill="none" stroke-linecap="round" stroke-width="4" d="M4 10l5 5 9-9" />
+                </svg>
+                <span class="checkbox__label">{{ location }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="antivirus-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<div id="logOutput" style="white-space: pre-wrap; background-color: #f8f9fa; padding: 10px; margin-top: 20px; border: 1px solid #ddd;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+<script>
+    function logMessage(message) {
+        $('#logOutput').append(message + '\n');
+    }
+
+    $(document).ready(function() {
+
+        // Calculate the date 5 days ago
+        var fiveDaysAgoMoment = moment().subtract(5, 'days').startOf('day');
+        var fiveDaysAgo = fiveDaysAgoMoment.format("MM/DD/YYYY");
+
+        // Toggle Locations
+        $('#toggleLocationsButton').click(function() {
+            $('#locationCheckboxList').toggle();
+        });
+
+        // Function to get checked locations
+        function getCheckedLocations() {
+            var checkedLocations = [];
+            $('#locationCheckboxList input:checked').each(function() {
+                checkedLocations.push($(this).data('location'));
+            });
+            return checkedLocations;
+        }
+
+        // Unified filter function
+        function applyFilters() {
+
+            var filters = [];
+
+            if ($('#filterOlderThan5Days').is(':checked')) {
+                filters.push({field: "isDateLessThanReportDateMinus5", type: "=", value: true});
+            }
+
+            if ($('#filterNotMatchingPattern').is(':checked')) {
+                filters.push({field: "patternsMatch", type: "=", value: false});
+            }
+
+            var checkedLocations = getCheckedLocations();
+            if (checkedLocations.length > 0) {
+                filters.push({field: "location", type: "in", value: checkedLocations});
+            }
+
+            if (filters.length > 0) {
+                table.setFilter(filters);
+            } else {
+                table.clearFilter(true);
+            }
+        }
+
+        // Reapply filters when checkboxes are changed
+        $('#filterOlderThan5Days, #filterNotMatchingPattern').change(function() {
+            applyFilters();
+        });
+
+        // Reapply filters when location checkboxes are changed
+        $('#locationCheckboxList input').change(function() {
+            applyFilters();
+        });
+
+        // Display the date next to the checkbox
+        $('#olderThanDate').text(`(${fiveDaysAgo})`);
+
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                reportDate: "{{ row['Report Date'] }}",
+                computername: "{{ row.Computername }}",
+                ipAddress: "{{ row.IPAddress }}",
+                lastCommunicationTime: "{{ row.LastCommunicationTime }}",
+                isOnline: "{{ row.IsOnline }}",
+                productVersion: "{{ row.ProductVersion }}",
+                engineVersion: "{{ row.EngineVersion }}",
+                pattern: "{{ row.Pattern }}",
+                endpointPatternReleaseTime: "{{ row.EndpointPatternReleaseTime }}",
+                lastReleasedPattern: "{{ row.LastReleasedPattern }}",
+                // Strip dots from pattern and lastReleasedPattern
+                patternStripped: "{{ row.Pattern|replace('.', '') }}",
+                lastReleasedPatternStripped: "{{ row.LastReleasedPattern|replace('.', '') }}",
+                patternsMatch: "{{ row.Pattern|replace('.', '') }}" === "{{ row.LastReleasedPattern|replace('.', '') }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Preprocess the data to convert lastCommunicationTime to YYYYMMDD format
+        tableData.forEach(function(row) {
+            var date = moment(row.lastCommunicationTime, "M/D/YYYY h:mm:ss A");
+            row.lastCommunicationTimeFormatted = date.isValid() ? date.format("YYYYMMDD") : "00000000";
+
+            // New code to process Report Date
+            var reportDate = moment(row.reportDate, "YYYY-MM-DD");
+            if (reportDate.isValid()) {
+                reportDate.subtract(5, 'days');
+                row.reportDateStrippedMinus5Days = reportDate.format("YYYYMMDD");
+            } else {
+                row.reportDateStrippedMinus5Days = "00000000";
+            }
+
+            // New comparison for the additional column
+            row.isDateLessThanReportDateMinus5 = row.reportDateStrippedMinus5Days > row.lastCommunicationTimeFormatted;
+        });
+
+        // Initialize Tabulator
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Report Date", field: "reportDate", headerFilter: "input"},
+                {title: "Computername", field: "computername", headerFilter: "input"},
+                {title: "IPAddress", field: "ipAddress", headerFilter: "input"},
+                {title: "Last Communication Time", field: "lastCommunicationTime", headerFilter: "input"},
+                {title: "Is Online", field: "isOnline", headerFilter: "input"},
+                {title: "Product Version", field: "productVersion", headerFilter: "input"},
+                {title: "Engine Version", field: "engineVersion", headerFilter: "input"},
+                {title: "Pattern", field: "pattern", headerFilter: "input"},
+                {title: "Endpoint Pattern Release Time", field: "endpointPatternReleaseTime", headerFilter: "input"},
+                {title: "Last Released Pattern", field: "lastReleasedPattern", headerFilter: "input"},
+                {title: "Last Communication Time (Formatted)", field: "lastCommunicationTimeFormatted", visible: false},
+                {title: "Pattern (Stripped)", field: "patternStripped", visible: false},
+                {title: "Last Released Pattern (Stripped)", field: "lastReleasedPatternStripped", visible: false},
+                {title: "Patterns Match", field: "patternsMatch", visible: false},
+                {title: "Report Date (Stripped and -5 Days)", field: "reportDateStrippedMinus5Days", visible: false},
+                {title: "Is Date Less Than Report Date -5", field: "isDateLessThanReportDateMinus5", visible: false}
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Apply initial filters
+        applyFilters();
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "Antivirus Asset Report.csv");
+        });
+    });
+</script>
+
+{% endblock %}
+

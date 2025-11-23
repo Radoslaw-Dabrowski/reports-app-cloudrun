@@ -1,0 +1,93 @@
+{% extends "base-template.html" %}
+
+{% block title %}Certificate Expiry{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Certificate Expiry</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="filterExpiringSoon" checked>
+                <label for="filterExpiringSoon">Show only certificates expiring soon</label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <div class="certificate-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                reportDate: "{{ row['Report Date'] }}",
+                commonName: "{{ row['Common Name'] }}",
+                thumbprint: "{{ row.Thumbprint }}",
+                serialNumber: "{{ row['Serial Number'] }}",
+                issuedDate: "{{ row['Issued Date'] }}",
+                expirationDate: "{{ row['Expiration Date'] }}",
+                daysToExpire: parseInt("{{ row['Days to expire'] }}", 10)
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Adjust "Days to Expire" based on the current date
+        tableData.forEach(function(row) {
+            var reportDate = new Date(row.reportDate);
+            var currentDate = new Date();
+            var daysSinceReport = Math.floor((currentDate - reportDate) / (1000 * 60 * 60 * 24));
+            row.daysToExpire = row.daysToExpire - daysSinceReport; // Allow negative values
+        });
+
+        // Initialize Tabulator
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns", // Fit columns to width of table
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Report Date", field: "reportDate", headerFilter: "input"},
+                {title: "Common Name", field: "commonName", headerFilter: "input"},
+                {title: "Thumbprint", field: "thumbprint", headerFilter: "input"},
+                {title: "Serial Number", field: "serialNumber", headerFilter: "input"},
+                {title: "Issued Date", field: "issuedDate", headerFilter: "input"},
+                {title: "Expiration Date", field: "expirationDate", headerFilter: "input"},
+                {title: "Days to Expire", field: "daysToExpire", headerFilter: "input"},
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Checkbox filter functionality
+        $('#filterExpiringSoon').change(function() {
+            var isChecked = $(this).is(':checked');
+            console.log("Checkbox checked:", isChecked);
+            if(isChecked){
+                table.setFilter("daysToExpire", "<", 30); // Example: filter certificates expiring in less than 30 days
+            } else {
+                // Remove the filter when unchecked
+                table.removeFilter("daysToExpire");
+            }
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "Certificate Expiry Report.csv");
+        });
+
+        // Apply filters on page load
+        $('#filterExpiringSoon').trigger('change');
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base-template.html" %}
+
+{% block title %}RVTools vDisk{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid"></div>
+    <h1 class="text-center my-4">Password Expiration</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="filterRestore" checked>
+                <label for="filterRestore"> Path contains '_restore' </label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <div class="vhealth-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {   
+                customer: "{{ row['Customer'] }}",
+                location: "{{ row['Location'] }}",
+                report_date: "{{ row['Report Date'] }}",
+                rvtools_type: "{{ row['RVTools Type'] }}",
+                vm: "{{ row['VM'] }}",
+                disk: "{{ row['Disk'] }}",
+                capacity_mib: "{{ row['Capacity MiB'] }}",
+                path: "{{ row['Path'] }}",
+                cluster: "{{ row['Cluster'] }}",
+                folder: "{{ row['Folder'] }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Initialize Tabulator
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns", // Fit columns to width of table
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Date", field: "report_date", headerFilter: "input"},
+                {title: "RVTools Type", field: "rvtools_type", headerFilter: "input"},
+                {title: "VM", field: "vm", headerFilter: "input", tooltip: true},
+                {title: "Disk", field: "disk", headerFilter: "input"},
+                {title: "Capacity MiB", field: "capacity_mib", headerFilter: "input"},
+                {title: "Path", field: "path", headerFilter: "input", tooltip: true},
+                {title: "Cluster", field: "cluster", headerFilter: "input", tooltip: true},
+                {title: "Folder", field: "folder", headerFilter: "input", tooltip: true},
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Checkbox filter functionality
+        $('#filterRestore').change(function() {
+            var isChecked = $(this).is(':checked');
+            console.log("Checkbox checked:", isChecked);
+            if (isChecked) {
+                // Set filter to check for _restore after removing VM name from the path
+                table.setFilter(function(data) {
+                    var vmName = data.vm; // Extract VM name
+                    var path = data.path; // Get the path
+
+                    // Remove the VM name from the path
+                    var modifiedPath = path.replace(vmName, '');
+
+                    // Check if modified path contains _restore
+                    return modifiedPath.includes("_restore");
+                });
+            } else {
+                // Remove the filter when unchecked
+                table.clearFilter();
+            }
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "RVTools vDisk Report.csv");
+        });
+
+        // Apply filters on page load
+        $('#filterRestore').trigger('change');
+    });
+</script>
+{% endblock %}

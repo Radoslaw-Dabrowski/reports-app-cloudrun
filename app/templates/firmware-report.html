@@ -1,0 +1,71 @@
+{% extends "base-template.html" %}
+
+{% block title %}Firmware Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Firmware Reports</h1>
+
+    <div class="form-container mb-4">
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <div class="firmware-table-container table-container">
+        <div id="reportTable2"></div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                reportDate: "{{ row['Report Date'] }}",
+                hostname: "{{ row.Hostname }}",
+                cluster: "{{ row.Cluster }}",
+                hardwareModel: "{{ row['Hardware-Model'] }}",
+                nic: "{{ row['NIC'] }}",
+                description: "{{ row['Description'] }}",
+                adapterFirmware: "{{ row['Adapter-Firmware'] }}",
+                networkDriver: "{{ row['Network-Driver'] }}",
+                fcDriver: "{{ row['FC-Driver'] }}",
+                hbaModule: "{{ row['HBA-Module'] }}",
+                hbaVersion: "{{ row['HBA-Version'] }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Initialize Tabulator
+        var table = new Tabulator("#reportTable2", {
+            data: tableData,
+            layout: "fitColumns", // Fit columns to the width of the table
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Report Date", field: "reportDate", headerFilter: "input", sorter: "date"},
+                {title: "Hostname", field: "hostname", headerFilter: "input"},
+                {title: "Cluster", field: "cluster", headerFilter: "input"},
+                {title: "Hardware Model", field: "hardwareModel", headerFilter: "input"},
+                {title: "NIC", field: "nic", headerFilter: "input"},
+                {title: "Description", field: "description", headerFilter: "input"},
+                {title: "Adapter Firmware", field: "adapterFirmware", headerFilter: "input"},
+                {title: "Network Driver", field: "networkDriver", headerFilter: "input"},
+                {title: "FC Driver", field: "fcDriver", headerFilter: "input"},
+                {title: "HBA Module", field: "hbaModule", headerFilter: "input"},
+                {title: "HBA Version", field: "hbaVersion", headerFilter: "input"},
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "Firmware_Report.csv");
+        });
+    });
+</script>
+{% endblock %}

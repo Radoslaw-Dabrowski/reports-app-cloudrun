@@ -1,0 +1,375 @@
+{% extends "base-template.html" %}
+
+{% block head %}
+    {{ super() }}
+    <!-- Include Tabulator CSS and JS -->
+    <link href="https://unpkg.com/tabulator-tables@5.0.7/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.0.7/dist/js/tabulator.min.js"></script>
+
+{% endblock %}
+
+{% block title %}VMware ESXi and vCenter Versions{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">VMware ESXi and vCenter Versions</h1>
+
+    <!-- Location Selection Dropdown -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <label for="locationSelect">Select Location:</label>
+            <select id="locationSelect" class="form-select">
+                <option value="all">All Locations</option>
+                {% for location in locations %}
+                <option value="{{ location }}">{{ location }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 mt-2">
+            <input type="checkbox" id="excludeNoLabel" />
+            <label for="excludeNoLabel">Exclude NoLabel Entries</label>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h2>Registered VMware ESXi Versions</h2>
+            <div class="d-flex justify-content-between align-items-start">
+                <div id="esxi-versions-table" style="flex: 1;"></div>
+                <canvas id="esxi-pie-chart" style="max-width: 300px; max-height: 300px; margin-left: 20px;"></canvas>
+
+            </div>
+        </div>
+        <div class="col-md-6">
+            <h2>Registered vCenter Versions</h2>
+            <div class="d-flex justify-content-between align-items-start">
+                <div id="vcenter-versions-table" style="flex: 1;"></div>
+                <canvas id="vcenter-pie-chart" style="max-width: 300px; max-height: 300px; margin-left: 20px;"></canvas>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h3>Scraped VMware ESXi Versions</h3>
+            <div id="scrapedESXDataTable"></div>
+        </div>
+        <div class="col-md-6">
+            <h3>Scraped vCenter Versions</h3>
+            <div id="scrapedVCenterDataTable"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Predefined colors for specific versions from N to N-30
+    const versionColorMap = {
+        'N': '#FF6384',
+        'N-1': '#36A2EB',
+        'N-2': '#FFCE56',
+        'N-3': '#4BC0C0',
+        'N-4': '#9966FF',
+        'N-5': '#FF9F40',
+        'N-6': '#FF6384',
+        'N-7': '#36A2EB',
+        'N-8': '#FFCE56',
+        'N-9': '#4BC0C0',
+        'N-10': '#9966FF',
+        'N-11': '#FF9F40',
+        'N-12': '#FF6384',
+        'N-13': '#36A2EB',
+        'N-14': '#FFCE56',
+        'N-15': '#4BC0C0',
+        'N-16': '#9966FF',
+        'N-17': '#FF9F40',
+        'N-18': '#FF6384',
+        'N-19': '#36A2EB',
+        'N-20': '#FFCE56',
+        'N-21': '#4BC0C0',
+        'N-22': '#9966FF',
+        'N-23': '#FF9F40',
+        'N-24': '#FF6384',
+        'N-25': '#36A2EB',
+        'N-26': '#FFCE56',
+        'N-27': '#4BC0C0',
+        'N-28': '#9966FF',
+        'N-29': '#FF9F40',
+        'N-30': '#FF6384'
+    };
+
+    // Track chart instances
+    let esxiChartInstance = null;
+    let vcenterChartInstance = null;
+
+    // Event listener for location selection
+    document.getElementById('locationSelect').addEventListener('change', function() {
+        const selectedLocation = this.value;
+        fetchData(selectedLocation);
+    });
+
+    function fetchData(location) {
+        //alert(`Fetching data for location: ${location}`);
+
+        // Fetch and render data for ESXi versions
+        fetch(`/get_vhosts_data?location=${location}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('ESXi data:', data);
+
+                const filteredHostsData = location === 'all' ? data.hosts_table_data : data.hosts_table_data.filter(item => item.Location === location);
+
+                new Tabulator("#esxi-versions-table", {
+                    data: filteredHostsData,
+                    layout: "fitColumns",
+                    pagination: "local",
+                    paginationSize: 10,
+                    columns: [
+                        {title: "Customer", field: "Customer", tooltip: true},
+                        {title: "Location", field: "Location", tooltip: true},
+                        {title: "Host", field: "Host", tooltip: true},
+                        {title: "Version", field: "Version", tooltip: true},
+                        {title: "Build", field: "Build", tooltip: true},
+                        {title: "Label", field: "Label", tooltip: true}
+                    ]
+                });
+
+                new Tabulator("#scrapedESXDataTable", {
+                    data: data.scraped_data,
+                    layout: "fitColumns",
+                    columns: [
+                        {title: "Version", field: "Version", tooltip: true},
+                        {title: "Build Number", field: "Build Number", tooltip: true},
+                        {title: "Release Date", field: "Release Date", tooltip: true},
+                        {title: "Available As", field: "Available As", tooltip: true},
+                        {title: "Label", field: "Label", tooltip: true}
+                    ]
+                });
+
+                if (data.pie_chart_data) {
+                    //alert('ESXi pie chart data: ' + JSON.stringify(data.pie_chart_data)); // Alert the pie chart data
+                    esxiChartInstance = renderChartJS(data.pie_chart_data, "#esxi-pie-chart", "#esxi-versions-table", esxiChartInstance);
+                }
+            })
+            .catch(error => alert('Error fetching ESXi data: ' + error));
+
+        // Fetch and render data for vCenter versions
+        fetch(`/get_vinfo_data?location=${location}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('vCenter data:', data);
+
+                const filteredVcsMachinesData = location === 'all' ? data.vcs_machines_data : data.vcs_machines_data.filter(item => item.Location === location);
+
+                // Process data to extract Version and Build from VI SDK Server type
+                const processedVcsMachinesData = filteredVcsMachinesData.map(item => {
+                    const match = item['VI SDK Server type'].match(/VMware vCenter Server (\d+\.\d+)\.\d+ build-(\d+)/);
+                    const version = match ? match[1] : '';
+                    const build = match ? match[2] : '';
+
+                    return {
+                        ...item,
+                        Version: version,
+                        Build: build
+                    };
+                });
+
+                new Tabulator("#vcenter-versions-table", {
+                    data: processedVcsMachinesData,
+                    layout: "fitColumns",
+                    pagination: "local",
+                    paginationSize: 10,
+                    columns: [
+                        {title: "Customer", field: "Customer", tooltip: true},
+                        {title: "Location", field: "Location", tooltip: true},
+                        {title: "VM", field: "VM", tooltip: true},
+                        {title: "Version", field: "Version", tooltip: true},
+                        {title: "Build", field: "Build", tooltip: true},
+                        {title: "Label", field: "Label", tooltip: true}
+                    ]
+                });
+
+                new Tabulator("#scrapedVCenterDataTable", {
+                    data: data.vcenter_data,
+                    layout: "fitColumns",
+                    columns: [
+                        {title: "Release Name", field: "Release Name", tooltip: true},
+                        {title: "Version", field: "Version", tooltip: true},
+                        {title: "Release Date", field: "Date", tooltip: true},
+                        {title: "Build Number", field: "Build Version", tooltip: true},
+                        {title: "Label", field: "Label", tooltip: true}
+                    ]
+                });
+
+                if (data.pie_chart_data) {
+                    //alert('vCenter pie chart data: ' + JSON.stringify(data.pie_chart_data)); // Alert the pie chart data
+                    vcenterChartInstance = renderChartJS(data.pie_chart_data, "#vcenter-pie-chart", "#vcenter-versions-table", vcenterChartInstance);
+                } else {
+                    //alert("No pie chart data available for vCenter.");
+                }
+            })
+            .catch(error => console.error('Error fetching vCenter data:', error));
+    };
+
+    document.addEventListener("DOMContentLoaded", function() {
+        // Initial data fetch for all locations
+        fetchData('all');
+
+        // Apply initial filter if checkbox is checked
+        const excludeNoLabel = document.getElementById('excludeNoLabel').checked;
+        updateTableFilters(excludeNoLabel);
+    });
+
+    function renderChartJS(pieChartData, chartId, tableId, chartInstance) {
+        // Extract labels and data
+        const labels = pieChartData.map(item => item.Label);
+        const data = pieChartData.map(item => item.count);
+        const totalCount = data.reduce((sum, count) => sum + count, 0);
+
+        // Combine labels and data into a single array for sorting
+        const combinedData = labels.map((label, index) => ({
+            label: label,
+            count: data[index]
+        }));
+
+        // Sort combined data: N, N-1, ..., N-999, NoLabel
+        combinedData.sort((a, b) => {
+            if (a.label === 'NoLabel') return 1;
+            if (b.label === 'NoLabel') return -1;
+            const aNum = a.label === 'N' ? 0 : parseInt(a.label.split('-')[1]);
+            const bNum = b.label === 'N' ? 0 : parseInt(b.label.split('-')[1]);
+            return aNum - bNum;
+        });
+
+        // Separate sorted labels and data
+        const sortedLabels = combinedData.map(item => item.label);
+        const sortedData = combinedData.map(item => item.count);
+
+        // Destroy existing chart instance if it exists
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        // Create new chart instance
+        chartInstance = new Chart(document.querySelector(chartId), {
+            type: 'pie',
+            data: {
+                labels: sortedLabels,
+                datasets: [{
+                    data: sortedData,
+                    backgroundColor: sortedLabels.map(label => versionColorMap[label] || '#CCCCCC') // Default color if not mapped
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                return data.labels.map((label, index) => ({
+                                    text: `${label}: ${data.datasets[0].data[index]}`,
+                                    fillStyle: data.datasets[0].backgroundColor[index]
+                                }));
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: `Version Distribution (Total: ${totalCount})` // Add total count here
+                        }
+                    }
+                },
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const selectedLabel = sortedLabels[index];
+                        filterTable(tableId, selectedLabel);
+                    }
+                }
+            }
+        });
+
+        return chartInstance;
+    }
+
+
+    function filterTable(tableId, label) {
+        const table = Tabulator.findTable(tableId)[0];
+        if (label === 'NoLabel') {
+            // Adjust the filter to match entries with the label 'NoLabel'
+            table.setFilter("Label", "=", 'NoLabel');
+        } else {
+            table.setFilter("Label", "=", label);
+        }
+    }
+
+    document.getElementById('excludeNoLabel').addEventListener('change', function() {
+        const excludeNoLabel = this.checked;
+        updateTableFilters(excludeNoLabel);
+    });
+
+    function updateTableFilters(excludeNoLabel) {
+        const esxiTable = Tabulator.findTable("#esxi-versions-table")[0];
+        const vcenterTable = Tabulator.findTable("#vcenter-versions-table")[0];
+
+        if (excludeNoLabel) {
+            esxiTable.setFilter("Label", "!=", "NoLabel");
+            vcenterTable.setFilter("Label", "!=", "NoLabel");
+        } else {
+            esxiTable.clearFilter();
+            vcenterTable.clearFilter();
+        }
+
+        // Refresh pie charts
+        refreshPieCharts(esxiTable, vcenterTable);
+    }
+
+    function refreshPieCharts(esxiTable, vcenterTable) {
+        const esxiData = esxiTable.getData("active");
+        const vcenterData = vcenterTable.getData("active");
+
+        const esxiPieData = preparePieChartData(esxiData, 'Label');
+        const vcenterPieData = preparePieChartData(vcenterData, 'Label');
+
+        // Destroy existing chart instances if they exist
+        if (esxiChartInstance) {
+            esxiChartInstance.destroy();
+            esxiChartInstance = null; // Set to null after destruction
+        }
+        if (vcenterChartInstance) {
+            vcenterChartInstance.destroy();
+            vcenterChartInstance = null; // Set to null after destruction
+        }
+
+        // Create new chart instances
+        esxiChartInstance = renderChartJS(esxiPieData, "#esxi-pie-chart", "#esxi-versions-table", null);
+        vcenterChartInstance = renderChartJS(vcenterPieData, "#vcenter-pie-chart", "#vcenter-versions-table", null);
+
+        // Update total count display
+        document.getElementById('esxi-total-count').textContent = `Total amount of hosts: ${esxiData.length}`;
+        document.getElementById('vcenter-total-count').textContent = `Total amount of hosts: ${vcenterData.length}`;
+    }
+
+    function preparePieChartData(data, labelField) {
+        const pieChartData = data.reduce((acc, item) => {
+            const label = item[labelField] || 'NoLabel';
+            if (!acc[label]) {
+                acc[label] = 0;
+            }
+            acc[label]++;
+            return acc;
+        }, {});
+
+        return Object.entries(pieChartData).map(([label, count]) => ({ Label: label, count }));
+    }
+
+    function generateUniqueId() {
+        return Math.floor(100000000 + Math.random() * 900000000).toString();
+    }
+
+</script>
+{% endblock %}
+

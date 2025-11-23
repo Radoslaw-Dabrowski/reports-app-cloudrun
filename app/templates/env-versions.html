@@ -1,0 +1,99 @@
+{% extends "base-template.html" %}
+
+{% block title %}Env Versions{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Env Versions</h1>
+
+
+
+    <!-- Form for Filters and Actions -->
+    <div class="form-container mb-4">
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <!-- Table for Tabulator to render -->
+    <div class="env-versions-table-container table-container">
+        <div id="envVersionsTable"></div> <!-- Tabulator will render here -->
+    </div>
+
+    <!-- Log messages will appear here -->
+    <div id="logMessages" style="margin-top: 20px; border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: auto;">
+        <h4>Log Messages</h4>
+    </div>
+</div>
+
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+    $(document).ready(function() {
+        // Function to log messages to the page
+        function logMessage(message) {
+            $('#logMessages').append('<p>' + message + '</p>');
+        }
+
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                reportDate: "{{ row['Report Date'] }}",
+                vm: "{{ row.VM }}",
+                name: "{{ row.Name }}",
+                service: "{{ row.Service }}",
+                description: "{{ row.Description }}",
+                installedVersion: "{{ row['Installed Version'] }}",
+                dhcVer: "{{ row['DHCVer'] }}",
+                devEnv: "{{ row['devEnv'] }}",
+                nonVcfInventory: "{{ row['Non-VCF Inventory'] }}",
+                vcfInventory: "{{ row['VCF Inventory'] }}",
+                reportType: "{{ row['reportType'] }}",
+                timeStamp: "{{ row['timeStamp'] }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Log the initial table data
+        logMessage("Initial table data: " + JSON.stringify(tableData));
+
+        // Initialize Tabulator
+        var table = new Tabulator("#envVersionsTable", {
+            data: tableData,
+            layout: "fitColumns",
+            columns: [
+                // columns: Customer	Location	Report Date	VM	Name	Service	Description	Installed Version	DHCVer	devEnv	Non-VCF Inventory	reportType	timeStamp
+
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Report Date", field: "reportDate", headerFilter: "input", sorter: "date"},
+                {title: "VM", field: "vm", headerFilter: "input"},
+                {title: "Name", field: "name", headerFilter: "input"},
+                {title: "Service", field: "service", headerFilter: "input"},
+                {title: "Description", field: "description", headerFilter: "input", tooltip: true},
+                {title: "Installed Version", field: "installedVersion", headerFilter: "input"},
+                {title: "DHCVer", field: "dhcVer", headerFilter: "input"},
+                {title: "devEnv", field: "devEnv", headerFilter: "input"},
+                {title: "Non-VCF Inventory", field: "nonVcfInventory", headerFilter: "input", tooltip: true},
+                {title: "VCF Inventory", field: "vcfInventory", headerFilter: "input", tooltip: true},
+                {title: "reportType", field: "reportType", headerFilter: "input"},
+                {title: "timeStamp", field: "timeStamp", headerFilter: "input"},
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "Env_Versions.csv");
+        });
+
+    });
+</script>
+{% endblock %}
+

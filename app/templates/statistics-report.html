@@ -1,0 +1,156 @@
+{% extends "base-template.html" %}
+
+{% block title %}Statistics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">Statistics</h1>
+
+    <div class="form-container mb-4">
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+            <a href="/alerts_report" class="btn btn-secondary">View Alerts</a>
+        </div>
+    </div>
+
+    <div class="vhealth-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+
+    <!-- Log container -->
+    <div id="logContainer" class="mt-4">
+        <h3>Logs</h3>
+        <ul id="logList" class="list-unstyled"></ul>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Function to log messages
+        function logMessage(message, type = 'info') {
+            const logList = document.getElementById('logList');
+            const logItem = document.createElement('li');
+            logItem.textContent = `[${type.toUpperCase()}] ${message}`;
+            logList.appendChild(logItem);
+        }
+
+        // Example usage of logMessage
+        logMessage('Initializing table data', 'debug');
+        
+        // Data to be rendered by Tabulator (replace with actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.customer }}",
+                location: "{{ row.location }}",
+                date: "{{ row.date }}",
+                critical: "{{ row.critical }}",
+                immediate: "{{ row.immediate }}",
+                warning: "{{ row.warning }}",
+                total: "{{ row.total }}",
+                color: "{{ row.color }}"
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        // Initialize Tabulator with expandable rows
+        var table = new Tabulator("#reportTable", {
+            layout: "fitColumns",
+            columns: [
+                {
+                    formatter: function(cell, formatterParams, onRendered) {
+                        // Custom expand/collapse button
+                        return "<button class='toggle-btn'>+</button>";
+                    },
+                    width: 30,
+                    hozAlign: "center",
+                    cellClick: function(e, cell) {
+                        var row = cell.getRow();
+                        if (row.getElement().classList.contains("expanded")) {
+                            // Collapse row if expanded
+                            row.getElement().classList.remove("expanded");
+                            row.getElement().querySelector(".toggle-btn").innerText = "+";
+                            row.getElement().querySelector(".expanded-content").remove();
+                            logMessage(`Row collapsed for location: ${row.getData().location}`, 'info');
+                        } else {
+                            // Expand row and fetch historical data
+                            row.getElement().classList.add("expanded");
+                            row.getElement().querySelector(".toggle-btn").innerText = "-";
+
+                            // Create container for expanded content
+                            var expandedContent = document.createElement("div");
+                            expandedContent.className = "expanded-content";
+                            expandedContent.innerHTML = "<p>Loading historical data...</p>";
+                            row.getElement().appendChild(expandedContent);
+
+                            // Fetch historical data for the location
+                            var location = row.getData().location;
+                            logMessage(`Fetching historical data for location: ${location}`, 'debug');
+                            $.get('/get_trend_data', { location: location }, function(data) {
+                                if (data.length > 0) {
+                                    var contentHtml = `
+                                        <table class="table table-striped mt-2">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Critical</th>
+                                                    <th>Immediate</th>
+                                                    <th>Warning</th>
+                                                    <th>Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                    `;
+                                    data.forEach(function(row) {
+                                        contentHtml += `
+                                            <tr>
+                                                <td>${row.date}</td>
+                                                <td>${row.critical !== undefined ? row.critical : 'Miss'}</td>
+                                                <td>${row.immediate !== undefined ? row.immediate : 'Miss'}</td>
+                                                <td>${row.warning !== undefined ? row.warning : 'Miss'}</td>
+                                                <td>${row.total !== undefined ? row.total : 'Miss'}</td>
+                                            </tr>
+                                        `;
+                                    });
+                                    contentHtml += "</tbody></table>";
+                                    expandedContent.innerHTML = contentHtml;
+                                    logMessage(`Historical data loaded for location: ${location}`, 'info');
+                                } else {
+                                    expandedContent.innerHTML = "<p>No historical data available for this location.</p>";
+                                    logMessage(`No historical data available for location: ${location}`, 'warning');
+                                }
+                            }).fail(function() {
+                                expandedContent.innerHTML = "<p>Failed to fetch historical data.</p>";
+                                logMessage(`Failed to fetch historical data for location: ${location}`, 'error');
+                            });
+                        }
+                    }
+                },
+                {title: "Customer", field: "customer", headerFilter: "input"},
+                {title: "Location", field: "location", headerFilter: "input"},
+                {title: "Date", field: "date", headerFilter: "input"},
+                {title: "Critical", field: "critical", headerFilter: "input", formatter: "html"},
+                {title: "Immediate", field: "immediate", headerFilter: "input", formatter: "html"},
+                {title: "Warning", field: "warning", headerFilter: "input", formatter: "html"},
+                {title: "Total", field: "total", headerFilter: "input"}
+            ],
+            data: tableData,
+            pagination: "local",
+            paginationSize: 100,
+            rowFormatter: function(row) {
+                var data = row.getData();
+                if (data.color) {
+                    row.getElement().style.backgroundColor = data.color;
+                }
+            }
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "Statistics Report.csv");
+            logMessage('CSV export initiated', 'info');
+        });
+    });
+</script>
+
+{% endblock %}

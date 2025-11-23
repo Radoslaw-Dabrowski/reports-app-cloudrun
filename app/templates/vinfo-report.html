@@ -1,0 +1,94 @@
+{% extends "base-template.html" %}
+
+{% block title %}RVTools vInfo{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="text-center my-4">RVTools vInfo</h1>
+
+    <div class="form-container mb-4">
+        <ul class="ks-cboxtags">
+            <li>
+                <input type="checkbox" id="filterNoBackupPolicy" checked>
+                <label for="filterNoBackupPolicy">Show only entries without Backup Policy</label>
+            </li>
+        </ul>
+        
+        <div class="action-buttons">
+            <button id="exportButton" class="btn btn-primary">Export to CSV</button>
+        </div>
+    </div>
+
+    <div class="vhealth-table-container table-container">
+        <div id="reportTable"></div> <!-- Tabulator will render here -->
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        // Sample data (replace with your actual data)
+        var tableData = [
+            {% for row in table_data %}
+            {
+                customer: "{{ row.Customer }}",
+                location: "{{ row.Location }}",
+                date: "{{ row.Date }}",
+                rvtoolsType: "{{ row['RVTools Type'] }}",
+                vm: "{{ row.VM }}",
+                powerstate: "{{ row.Powerstate }}",
+                cpus: "{{ row.CPUs }}",
+                memory: "{{ row.Memory }}",
+                primaryIp: "{{ row['Primary IP Address'] }}",
+                network1: "{{ row['Network #1'] }}",
+                network2: "{{ row['Network #2'] }}",
+                network3: "{{ row['Network #3'] }}",
+                cluster: "{{ row.Cluster }}",
+                backupPolicy: "{{ row.backupPolicy }}"
+            }{% if not loop.last %},{% endif %}{% endfor %}
+        ];
+
+        // Initialize Tabulator
+        var table = new Tabulator("#reportTable", {
+            data: tableData,
+            layout: "fitColumns", // Fit columns to width of table
+            columns: [
+                {title: "Customer", field: "customer", headerFilter: "input", tooltip: true},
+                {title: "Location", field: "location", headerFilter: "input", tooltip: true},
+                {title: "Date", field: "date", headerFilter: "input", tooltip: true},
+                {title: "RVTools Type", field: "rvtoolsType", headerFilter: "input", tooltip: true},
+                {title: "VM", field: "vm", headerFilter: "input", tooltip: true},
+                {title: "Powerstate", field: "powerstate", headerFilter: "input", tooltip: true},
+                {title: "CPUs", field: "cpus", headerFilter: "input", tooltip: true},
+                {title: "Memory", field: "memory", headerFilter: "input", tooltip: true},
+                {title: "Primary IP Address", field: "primaryIp", headerFilter: "input", tooltip: true},
+                {title: "Network #1", field: "network1", headerFilter: "input", tooltip: true},
+                {title: "Network #2", field: "network2", headerFilter: "input", tooltip: true},
+                {title: "Network #3", field: "network3", headerFilter: "input", tooltip: true},
+                {title: "Cluster", field: "cluster", headerFilter: "input", tooltip: true},
+                {title: "Backup Policy", field: "backupPolicy", headerFilter: "input", tooltip: true},
+            ],
+            pagination: "local",
+            paginationSize: 100,
+        });
+
+        // Checkbox filter functionality
+        $('#filterNoBackupPolicy').change(function() {
+            var isChecked = $(this).is(':checked');
+            console.log("Checkbox checked:", isChecked);
+            if(isChecked){
+                table.setFilter("backupPolicy", "=", "None");
+            } else {
+                table.clearFilter();
+            }
+        });
+
+        // Export to CSV functionality
+        $('#exportButton').click(function() {
+            table.download("csv", "RVTools vInfo Report.csv");
+        });
+
+        // Apply filters on page load
+        $('#filterNoBackupPolicy').trigger('change');
+    });
+</script>
+{% endblock %}
