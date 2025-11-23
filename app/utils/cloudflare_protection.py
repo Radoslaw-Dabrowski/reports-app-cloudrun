@@ -93,9 +93,16 @@ def check_cloudflare_protection():
     has_cloudflare_headers = has_cf_connecting_ip or has_cf_ray or has_cf_country
     
     # If we have Cloudflare headers, allow if host is correct
+    # BUT: If Host is Cloud Run URL but we have Cloudflare headers, it means Worker didn't set Host correctly
+    # In this case, we'll be more lenient and allow it (Worker is proxying from Cloudflare)
     if has_cloudflare_headers:
         if host_allowed:
             logger.debug(f"Allowed: Request from Cloudflare with valid Host ({host})")
+            return True
+        elif 'run.app' in host or 'cloudfunctions.net' in host:
+            # Worker is proxying from Cloudflare but didn't set Host header correctly
+            # Allow it anyway since we have Cloudflare headers (more lenient for Worker issues)
+            logger.warning(f"Allowed: Cloudflare request with Cloud Run Host ({host}) - Worker may not set Host header correctly, but allowing due to Cloudflare headers")
             return True
         else:
             logger.warning(f"Blocked: Cloudflare request but invalid Host ({host}, allowed: {allowed_hosts})")
