@@ -6,6 +6,7 @@ import logging
 import os
 from flask import Flask
 from flask_caching import Cache
+from app.utils.cloudflare_protection import cloudflare_protection_middleware
 
 # Initialize extensions
 cache = Cache()
@@ -39,6 +40,12 @@ def create_app(config_name: str = None):
 
     # Register error handlers
     register_error_handlers(app)
+
+    # Cloudflare protection - block direct access
+    if app.config.get('REQUIRE_CLOUDFLARE', True):
+        @app.before_request
+        def check_cloudflare():
+            return cloudflare_protection_middleware()
 
     # Add security headers
     @app.after_request

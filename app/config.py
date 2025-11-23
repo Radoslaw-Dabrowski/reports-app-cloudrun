@@ -45,6 +45,11 @@ class Config:
     # Set to 'gcs-only' to force GCS and fail if GCS is not available
     DATA_SOURCE = os.getenv('DATA_SOURCE', 'gcs')
     FORCE_GCS_ONLY = os.getenv('FORCE_GCS_ONLY', 'false').lower() == 'true'
+    
+    # Cloudflare protection
+    ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'reporting.dabronet.pl').split(',')
+    REQUIRE_CLOUDFLARE = os.getenv('REQUIRE_CLOUDFLARE', 'true').lower() == 'true'
+    CLOUDFLARE_IPS_URL = 'https://www.cloudflare.com/ips-v4'
 
     # Redis Cache (Cloud Memorystore)
     REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
