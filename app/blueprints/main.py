@@ -67,10 +67,14 @@ def get_s3_manager():
 
 def get_gcs_manager():
     """Get GCS manager instance"""
-    return GCSManager(
-        bucket_name=Config.GCS_BUCKET_NAME,
-        project_id=Config.GCP_PROJECT_ID
-    )
+    try:
+        return GCSManager(
+            bucket_name=Config.GCS_BUCKET_NAME,
+            project_id=Config.GCP_PROJECT_ID
+        )
+    except ImportError as e:
+        logger.warning(f"GCS not available: {e}. Falling back to S3.")
+        return None
 
 
 def get_storage_manager():
@@ -80,12 +84,17 @@ def get_storage_manager():
     """
     if Config.DATA_SOURCE == 'gcs':
         gcs_manager = get_gcs_manager()
-        # Check if GCS has data, if not fallback to S3
-        if gcs_manager.file_exists('report.csv'):
-            return gcs_manager
-        else:
-            logger.warning("GCS cache empty, falling back to S3")
-            return get_s3_manager()
+        if gcs_manager is not None:
+            try:
+                # Check if GCS has data, if not fallback to S3
+                if gcs_manager.file_exists('report.csv'):
+                    return gcs_manager
+                else:
+                    logger.warning("GCS cache empty, falling back to S3")
+            except Exception as e:
+                logger.warning(f"GCS error: {e}. Falling back to S3.")
+        # Fallback to S3 if GCS is not available or has no data
+        return get_s3_manager()
     else:
         return get_s3_manager()
 

@@ -5,11 +5,20 @@ Used as cache for S3 data to reduce egress costs.
 import logging
 from typing import Optional
 import pandas as pd
-from google.cloud import storage
-from google.cloud.exceptions import GoogleCloudError
 from io import StringIO
 
 logger = logging.getLogger(__name__)
+
+# Optional import - if not available, GCS features will be disabled
+try:
+    from google.cloud import storage
+    from google.cloud.exceptions import GoogleCloudError
+    GCS_AVAILABLE = True
+except ImportError:
+    logger.warning("google-cloud-storage not available. GCS features will be disabled.")
+    GCS_AVAILABLE = False
+    storage = None
+    GoogleCloudError = Exception
 
 
 class GCSManager:
@@ -27,6 +36,8 @@ class GCSManager:
     @property
     def storage_client(self):
         """Lazy initialization of GCS client"""
+        if not GCS_AVAILABLE:
+            raise ImportError("google-cloud-storage is not installed. Install it with: pip install google-cloud-storage")
         if self._storage_client is None:
             logger.info("Initializing GCS client")
             if self.project_id:
