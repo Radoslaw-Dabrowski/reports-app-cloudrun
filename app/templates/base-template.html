@@ -133,10 +133,11 @@
         var button = this;
         button.disabled = true;
 
-        fetch('/refresh_cache?next=' + encodeURIComponent(window.location.pathname), {
+        fetch('/refresh_cache?next=' + encodeURIComponent(window.location.pathname) + '&format=json', {
             method: 'GET',
             headers: {
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
             }
         })
             .then(response => {

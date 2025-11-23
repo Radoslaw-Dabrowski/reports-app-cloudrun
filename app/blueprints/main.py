@@ -901,11 +901,16 @@ def refresh_cache():
         gcs_manager = get_gcs_manager()
         
         if gcs_manager is None:
-            error_msg = 'GCS not available. Install google-cloud-storage package.'
-            logger.error(error_msg)
+            error_msg = 'GCS not available. Install google-cloud-storage package. Using S3 directly.'
+            logger.warning(error_msg)
+            # Return JSON even for GET requests (for AJAX calls)
+            if request.headers.get('Accept') == 'application/json' or request.args.get('format') == 'json':
+                return jsonify({'status': 'warning', 'message': error_msg, 'note': 'Data will be read from S3 directly until GCS is configured.'}), 200
+            # For regular GET requests (browser navigation), redirect
             if request.method == 'GET':
-                flash(error_msg, 'error')
-                return redirect(url_for('main.index'))
+                flash(error_msg, 'warning')
+                next_page = request.args.get('next', 'main.index')
+                return redirect(url_for(next_page))
             return jsonify({'status': 'error', 'message': error_msg}), 500
         
         # List of CSV files to copy
