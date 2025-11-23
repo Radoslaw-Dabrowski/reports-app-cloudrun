@@ -81,8 +81,9 @@ def init_database(app):
     """Initialize database connection (lazy)"""
     from app.utils.database import db_manager
 
-    @app.before_first_request
-    def setup_database():
+    # Flask 2.2+ removed before_first_request, so we initialize directly
+    # with app context to ensure it's available when needed
+    with app.app_context():
         app.logger.info("Initializing database connection")
         database_url = app.config['get_database_url']()
         db_manager.init_engine(database_url)
