@@ -72,9 +72,10 @@ def index():
 
 @main_bp.route('/snapshot_report')
 def snapshot_report_page():
-    """Snapshot report page"""
+    """Snapshot report page - reads directly from S3"""
     try:
-        snapshot_reports_df = db_manager.read_table('combined_snapshot_reports')
+        s3_manager = get_s3_manager()
+        snapshot_reports_df = s3_manager.read_csv('combined_snapshot_reports.csv')
         if snapshot_reports_df.empty:
             return render_template(TEMPLATE_SNAPSHOT_REPORTS, table_data=[])
         table_data = snapshot_reports_df.to_dict(orient='records')
@@ -86,9 +87,10 @@ def snapshot_report_page():
 
 @main_bp.route('/vhealth_report')
 def vhealth_report_page():
-    """vHealth report page"""
+    """vHealth report page - reads directly from S3"""
     try:
-        combined_vhealth_df = db_manager.read_table('combined_vhealth_reports')
+        s3_manager = get_s3_manager()
+        combined_vhealth_df = s3_manager.read_csv('combined_vhealth_reports.csv')
         if combined_vhealth_df.empty:
             return render_template(TEMPLATE_VHEALTH_REPORTS, table_data='[]')
         table_data = combined_vhealth_df.to_dict(orient='records')
@@ -101,10 +103,11 @@ def vhealth_report_page():
 
 @main_bp.route('/firmware_report')
 def firmware_report_page():
-    """Firmware report page"""
+    """Firmware report page - reads directly from S3"""
     try:
-        combined_firmware_df = db_manager.read_table('combined_firmware_reports')
-        customer_locations_df = db_manager.read_table('customer_locations')
+        s3_manager = get_s3_manager()
+        combined_firmware_df = s3_manager.read_csv('combined_firmware_reports.csv')
+        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
         
         if combined_firmware_df.empty or customer_locations_df.empty:
             return render_template(TEMPLATE_FIRMWARE_REPORTS, table_data=[], customers=[], locations=[])
@@ -169,9 +172,10 @@ def vinfo_report_page():
 
 @main_bp.route('/vdisk_report')
 def vdisk_report_page():
-    """vDisk report page"""
+    """vDisk report page - reads directly from S3"""
     try:
-        combined_vdisk_reports_df = db_manager.read_table('combined_vdisk_reports')
+        s3_manager = get_s3_manager()
+        combined_vdisk_reports_df = s3_manager.read_csv('combined_vdisk_reports.csv')
         if combined_vdisk_reports_df.empty:
             return render_template(TEMPLATE_VDISK_REPORT, table_data=[])
         table_data = combined_vdisk_reports_df.to_dict(orient='records')
@@ -183,9 +187,10 @@ def vdisk_report_page():
 
 @main_bp.route('/vhosts_report')
 def vhosts_report_page():
-    """vHosts report page"""
+    """vHosts report page - reads directly from S3"""
     try:
-        combined_vhosts_reports_df = db_manager.read_table('combined_vhosts_reports')
+        s3_manager = get_s3_manager()
+        combined_vhosts_reports_df = s3_manager.read_csv('combined_vhosts_reports.csv')
         if combined_vhosts_reports_df.empty:
             return render_template(TEMPLATE_VHOSTS_REPORT, table_data=[])
         table_data = combined_vhosts_reports_df.to_dict(orient='records')
@@ -197,9 +202,10 @@ def vhosts_report_page():
 
 @main_bp.route('/statistics_report')
 def statistics_report_page():
-    """Statistics report page"""
+    """Statistics report page - reads directly from S3"""
     try:
-        vrops_alerts_df = db_manager.read_table('vrops_alerts_historical')
+        s3_manager = get_s3_manager()
+        vrops_alerts_df = s3_manager.read_csv('vrops_alerts_historical.csv')
         
         if vrops_alerts_df.empty:
             return render_template(TEMPLATE_STATISTICS_REPORT, table_data=[], locations=[])
@@ -248,9 +254,10 @@ def statistics_report_page():
 
 @main_bp.route('/network_utilization_report')
 def network_utilization_report_page():
-    """Network utilization report page"""
+    """Network utilization report page - reads directly from S3"""
     try:
-        combined_network_utilization_df = db_manager.read_table('combined_network_utilization_report')
+        s3_manager = get_s3_manager()
+        combined_network_utilization_df = s3_manager.read_csv('combined_network_utilization_report.csv')
         
         # Load exclusions from S3
         excluded_networks_df = pd.DataFrame(columns=['Network', 'Location'])
@@ -283,7 +290,7 @@ def network_utilization_report_page():
         
         table_data = combined_network_utilization_df.to_dict(orient='records')
         
-        customer_locations_df = db_manager.read_table('customer_locations')
+        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
         if customer_locations_df.empty:
             return render_template(TEMPLATE_NETWORK_UTILIZATION_REPORT, table_data=table_data, locations=[], customers=[])
         
@@ -310,12 +317,13 @@ def network_utilization_report_page():
 
 @main_bp.route('/certificate_expiry_report')
 def certificate_expiry_report_page():
-    """Certificate expiry report page"""
+    """Certificate expiry report page - reads directly from S3"""
     try:
-        certificate_expiry_df = db_manager.read_table('combined_certificate_expiry_reports')
+        s3_manager = get_s3_manager()
+        certificate_expiry_df = s3_manager.read_csv('combined_certificate_expiry_reports.csv')
         table_data = certificate_expiry_df.to_dict(orient='records') if not certificate_expiry_df.empty else []
         
-        customer_locations_df = db_manager.read_table('customer_locations')
+        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
         if customer_locations_df.empty:
             return render_template(TEMPLATE_CERTIFICATE_EXPIRY_REPORT, table_data=table_data, customers=[], locations=[])
         
@@ -341,12 +349,13 @@ def certificate_expiry_report_page():
 
 @main_bp.route('/password_expiration_report')
 def password_expiration_report_page():
-    """Password expiration report page"""
+    """Password expiration report page - reads directly from S3"""
     try:
-        password_expiration_df = db_manager.read_table('combined_password_expiration_reports')
+        s3_manager = get_s3_manager()
+        password_expiration_df = s3_manager.read_csv('combined_password_expiration_reports.csv')
         table_data = password_expiration_df.to_dict(orient='records') if not password_expiration_df.empty else []
         
-        customer_locations_df = db_manager.read_table('customer_locations')
+        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
         if customer_locations_df.empty:
             return render_template(TEMPLATE_PASSWORD_EXPIRATION_REPORT, table_data=table_data, customers=[], locations=[])
         
@@ -372,12 +381,13 @@ def password_expiration_report_page():
 
 @main_bp.route('/antivirus_asset_report')
 def antivirus_asset_report_page():
-    """Antivirus asset report page"""
+    """Antivirus asset report page - reads directly from S3"""
     try:
-        combined_antivirus_asset_report_df = db_manager.read_table('combined_antivirus_asset_reports')
+        s3_manager = get_s3_manager()
+        combined_antivirus_asset_report_df = s3_manager.read_csv('combined_antivirus_asset_reports.csv')
         table_data = combined_antivirus_asset_report_df.to_dict(orient='records') if not combined_antivirus_asset_report_df.empty else []
         
-        customer_locations_df = db_manager.read_table('customer_locations')
+        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
         if customer_locations_df.empty:
             return render_template(TEMPLATE_ANTIVIRUS_ASSET_REPORT, table_data=table_data, customers=[], locations=[])
         
@@ -403,10 +413,11 @@ def antivirus_asset_report_page():
 
 @main_bp.route('/env_versions_report')
 def env_versions_report_page():
-    """Environment versions report page"""
+    """Environment versions report page - reads directly from S3"""
     try:
-        combined_non_vcf_inventory_df = db_manager.read_table('combined_non_vcf_inventory')
-        combined_vcf_inventory_df = db_manager.read_table('combined_vcf_inventory')
+        s3_manager = get_s3_manager()
+        combined_non_vcf_inventory_df = s3_manager.read_csv('combined_non_vcf_inventory.csv')
+        combined_vcf_inventory_df = s3_manager.read_csv('combined_vcf_inventory.csv')
         
         if combined_non_vcf_inventory_df.empty and combined_vcf_inventory_df.empty:
             return render_template(TEMPLATE_ENV_VERSIONS_REPORT, table_data=[])
@@ -443,10 +454,11 @@ def env_versions_report_page():
 
 @main_bp.route('/alerts_report')
 def alerts_report_page():
-    """Alerts report page"""
+    """Alerts report page - reads directly from S3"""
     try:
         location = request.args.get('location')
-        vrops_list_of_alerts_df = db_manager.read_table('combined_vrops_list_of_alerts')
+        s3_manager = get_s3_manager()
+        vrops_list_of_alerts_df = s3_manager.read_csv('combined_vrops_list_of_alerts.csv')
         
         if vrops_list_of_alerts_df.empty:
             return render_template(TEMPLATE_ALERTS_REPORT, alerts_data=[])
@@ -473,7 +485,7 @@ def alerts_report_page():
 @main_bp.route('/monthly_report')
 @cached(timeout=1800, key_prefix="monthly_report")
 def monthly_report_page():
-    """Monthly report page with caching"""
+    """Monthly report page - reads directly from S3"""
     month = int(request.args.get('month', pd.Timestamp.now().month))
     year = int(request.args.get('year', pd.Timestamp.now().year))
     selected_customer = request.args.get('customer', 'All Customers')
@@ -481,10 +493,11 @@ def monthly_report_page():
     selected_report = request.args.get('report', 'All Reports')
     exclude_missing = request.args.get('exclude_missing', 'false').lower() == 'true'
     
-    # Load data from database (stateless - load on each request)
-    reports_df = db_manager.read_table('report')
-    frequencies_df = db_manager.read_table('frequencies')
-    customer_location_df = db_manager.read_table('customer_locations')
+    # Load data directly from S3 (stateless)
+    s3_manager = get_s3_manager()
+    reports_df = s3_manager.read_csv('report.csv')
+    frequencies_df = s3_manager.read_csv('frequencies.csv')
+    customer_location_df = s3_manager.read_csv('customer_locations.csv')
     
     filtered_df = reports_df.copy()
     if selected_customer != 'All Customers':
@@ -525,53 +538,14 @@ def monthly_report_page():
 
 @main_bp.route('/refresh_cache', methods=['POST', 'GET'])
 def refresh_cache():
-    """Refresh data from S3 to database"""
-    try:
-        s3_manager = get_s3_manager()
-        
-        # List of CSV files to sync
-        csv_files = [
-            'report.csv',
-            'frequencies.csv',
-            'customer_locations.csv',
-            'combined_firmware_reports.csv',
-            'combined_vhealth_reports.csv',
-            'combined_snapshot_reports.csv',
-            'combined_network_utilization_report.csv',
-            'combined_certificate_expiry_reports.csv',
-            'combined_password_expiration_reports.csv',
-            'combined_antivirus_asset_reports.csv',
-            'combined_vdisk_reports.csv',
-            'combined_vhosts_reports.csv',
-            'rvtools_vinfo.csv',
-            'vrops_alerts_historical.csv',
-            'combined_vrops_list_of_alerts.csv',
-            'combined_non_vcf_inventory.csv',
-            'combined_vcf_inventory.csv',
-            'excluded_networks.csv'
-        ]
-        
-        for csv_file in csv_files:
-            logger.info(f"Syncing {csv_file}")
-            df = s3_manager.read_csv(csv_file)
-            
-            if not df.empty:
-                table_name = csv_file.replace('.csv', '')
-                if db_manager.table_exists(table_name):
-                    db_manager.truncate_table(table_name)
-                db_manager.write_table(df, table_name)
-        
-        if request.method == 'GET':
-            next_page = request.args.get('next', 'main.index')
-            return redirect(url_for(next_page))
-        
-        return jsonify({'status': 'success', 'message': 'Cache refreshed'}), 200
-        
-    except Exception as e:
-        logger.error(f"Error refreshing cache: {e}")
-        if request.method == 'GET':
-            return redirect(url_for('main.index'))
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    """Refresh cache - for Cloud Run, data is always read from S3, so this is a no-op"""
+    # In Cloud Run, we read directly from S3, so there's nothing to refresh
+    # This endpoint exists for compatibility with the original version
+    if request.method == 'GET':
+        next_page = request.args.get('next', 'main.index')
+        return redirect(url_for(next_page))
+    
+    return jsonify({'status': 'success', 'message': 'Data is always fresh from S3'}), 200
 
 
 # Additional routes for scraping and data APIs
@@ -581,9 +555,10 @@ import re
 
 
 def get_locations():
-    """Get list of locations from database"""
+    """Get list of locations from S3"""
     try:
-        customer_locations_df = db_manager.read_table('customer_locations')
+        s3_manager = get_s3_manager()
+        customer_locations_df = s3_manager.read_csv('customer_locations.csv')
         if customer_locations_df.empty:
             return []
         
@@ -653,9 +628,10 @@ def vmware_versions_report_page():
 
 @main_bp.route('/get_vhosts_data')
 def get_vhosts_data():
-    """Get vHosts data as JSON"""
+    """Get vHosts data as JSON - reads directly from S3"""
     location = request.args.get('location', 'all')
-    combined_vhosts_reports_df = db_manager.read_table('combined_vhosts_reports')
+    s3_manager = get_s3_manager()
+    combined_vhosts_reports_df = s3_manager.read_csv('combined_vhosts_reports.csv')
     
     def extract_version_and_build(esx_version):
         match = re.search(r'VMware ESXi (\d+\.\d+)\.\d+ build-(\d+)', str(esx_version))
@@ -735,10 +711,11 @@ def scrape_vcenter_versions():
 
 @main_bp.route('/get_vinfo_data')
 def get_vinfo_data():
-    """Get vInfo data as JSON"""
+    """Get vInfo data as JSON - reads directly from S3"""
     location = request.args.get('location', 'all')
     vcenter_data = scrape_vcenter_versions()
-    vinfo_df = db_manager.read_table('rvtools_vinfo')
+    s3_manager = get_s3_manager()
+    vinfo_df = s3_manager.read_csv('rvtools_vinfo.csv')
     vcs_machines = vinfo_df[vinfo_df['VM'].str.contains("vcs00", na=False)].copy()
     
     vcs_machines.loc[:, 'Location'] = vinfo_df.loc[
